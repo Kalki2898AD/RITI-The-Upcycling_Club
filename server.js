@@ -1,33 +1,31 @@
 const express = require('express');
-const { google } = require('googleapis');
 const cors = require('cors');
-const path = require('path');
-const QRCode = require('qrcode');
-const logger = require('./utils/logger');
-require('dotenv').config();
+const { google } = require('googleapis');
 const multer = require('multer');
-const upload = multer();
+const QRCode = require('qrcode');
+const path = require('path');
+require('dotenv').config();
 
 const app = express();
-const port = process.env.PORT || 3000;
+const upload = multer();
+const PORT = process.env.PORT || 3000;
 
+// Middleware
 app.use(cors());
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
-app.use(express.static('public'));
 
-// Error handler function
-function handleError(error, operation) {
-    logger.error(`Error during ${operation}:`, error);
-    return {
-        success: false,
-        message: `Operation failed: ${operation}`,
-        details: error.message,
-        stack: process.env.NODE_ENV !== 'production' ? error.stack : undefined
-    };
-}
+// Serve static files from the public directory
+app.use(express.static(path.join(__dirname, 'public')));
 
-// Handle private key formatting for Vercel
+// Serve index.html for the root route
+app.get('/', (req, res) => {
+    res.sendFile(path.join(__dirname, 'public', 'index.html'));
+});
+
+// Logger setup
+const logger = require('./utils/logger');
+
 const privateKey = process.env.GOOGLE_SHEETS_PRIVATE_KEY 
     ? process.env.GOOGLE_SHEETS_PRIVATE_KEY.replace(/\\n/g, '\n')
     : undefined;
@@ -251,7 +249,18 @@ app.get('/api/participant/:id', async (req, res) => {
     }
 });
 
+// Error handler function
+function handleError(error, operation) {
+    logger.error(`Error during ${operation}:`, error);
+    return {
+        success: false,
+        message: `Operation failed: ${operation}`,
+        details: error.message,
+        stack: process.env.NODE_ENV !== 'production' ? error.stack : undefined
+    };
+}
+
 // Start server
-app.listen(port, () => {
-    logger.info(`Server running at http://localhost:${port}`);
+app.listen(PORT, () => {
+    logger.info(`Server running at http://localhost:${PORT}`);
 });
