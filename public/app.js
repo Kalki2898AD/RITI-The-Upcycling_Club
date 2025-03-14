@@ -82,59 +82,62 @@ document.addEventListener('DOMContentLoaded', function() {
         });
     });
 
+    // Handle payment method selection
+    const handlePaymentMethod = async (method) => {
+        if (!selectedGames || !selectedAmount) {
+            alert('Please select a package first');
+            return;
+        }
+
+        selectedPaymentMethod = method;
+        document.getElementById('payment-method-display').value = method.toUpperCase();
+
+        // Reset payment button colors
+        document.querySelectorAll('.payment-method').forEach(btn => {
+            btn.classList.remove('bg-blue-600', 'bg-purple-600', 'bg-gray-600');
+        });
+
+        // Set selected button color
+        const button = document.querySelector(`[data-method="${method}"]`);
+        if (button) {
+            button.classList.add(method === 'gpay' ? 'bg-blue-600' : method === 'phonepe' ? 'bg-purple-600' : 'bg-gray-600');
+        }
+
+        if (method !== 'cash') {
+            try {
+                const response = await fetch('/qr-code', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({
+                        amount: selectedAmount,
+                        paymentMethod: method
+                    })
+                });
+
+                const result = await response.json();
+                if (result.success) {
+                    document.getElementById('payment-qr').src = result.qrCode;
+                    document.getElementById('qr-display').classList.remove('hidden');
+                } else {
+                    throw new Error(result.message);
+                }
+            } catch (error) {
+                alert('Failed to generate QR code. Please try again.');
+                console.error('QR code generation error:', error);
+            }
+        } else {
+            document.getElementById('qr-display').classList.add('hidden');
+        }
+
+        document.getElementById('registration-form').classList.remove('hidden');
+    };
+
     // Payment method selection
     document.querySelectorAll('.payment-method').forEach(button => {
         button.addEventListener('click', async function() {
-            selectedPaymentMethod = this.dataset.method;
-            
-            const displayMethod = selectedPaymentMethod === 'gpay' ? 'GPAY' : 
-                               selectedPaymentMethod === 'phonepe' ? 'PHONEPE' : 'CASH';
-            document.getElementById('payment-method-display').value = displayMethod;
-            
-            document.querySelectorAll('.payment-method').forEach(btn => {
-                btn.classList.remove('bg-blue-600', 'bg-purple-600', 'bg-gray-600');
-            });
-            
-            if (selectedPaymentMethod === 'gpay') {
-                this.classList.add('bg-blue-600');
-            } else if (selectedPaymentMethod === 'phonepe') {
-                this.classList.add('bg-purple-600');
-            } else {
-                this.classList.add('bg-gray-600');
-            }
-
-            const qrDisplay = document.getElementById('qr-display');
-            const registrationForm = document.getElementById('registration-form');
-
-            if (selectedPaymentMethod === 'cash') {
-                qrDisplay.classList.add('hidden');
-                registrationForm.classList.remove('hidden');
-            } else {
-                qrDisplay.classList.remove('hidden');
-                registrationForm.classList.add('hidden');
-
-                try {
-                    const response = await fetch('/qr-code', {
-                        method: 'POST',
-                        headers: {
-                            'Content-Type': 'application/json'
-                        },
-                        body: JSON.stringify({
-                            amount: selectedAmount,
-                            method: selectedPaymentMethod
-                        })
-                    });
-
-                    const data = await response.json();
-                    if (data.success) {
-                        document.getElementById('payment-qr').src = data.qrUrl;
-                    } else {
-                        alert('Failed to generate QR code. Please try again.');
-                    }
-                } catch (error) {
-                    alert('Failed to generate QR code. Please try again.');
-                }
-            }
+            await handlePaymentMethod(this.dataset.method);
         });
     });
 

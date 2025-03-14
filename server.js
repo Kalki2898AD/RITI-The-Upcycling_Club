@@ -70,35 +70,47 @@ const UPI_IDS = {
     phonepe: '6301852709@axl'
 };
 
-// QR code generation route
+// QR code generation endpoint
 app.post('/qr-code', async (req, res) => {
     try {
-        const { amount, method } = req.body;
+        const { amount, paymentMethod } = req.body;
         
-        if (!amount || !method || !UPI_IDS[method]) {
-            return res.status(400).json({ 
-                success: false, 
-                error: 'Invalid payment details' 
+        if (!amount || !paymentMethod) {
+            return res.status(400).json({
+                success: false,
+                message: 'Amount and payment method are required'
             });
         }
 
-        const upiUrl = `upi://pay?pa=${UPI_IDS[method]}&pn=RITI_CLUB&am=${amount}&cu=INR`;
-        const qrUrl = await QRCode.toDataURL(upiUrl);
+        let upiUrl;
+        if (paymentMethod === 'gpay') {
+            upiUrl = `upi://pay?pa=rishikeshvarma9854@okaxis&pn=RITI&am=${amount}&cu=INR`;
+        } else if (paymentMethod === 'phonepe') {
+            upiUrl = `upi://pay?pa=6301852709@axl&pn=RITI&am=${amount}&cu=INR`;
+        } else {
+            return res.status(400).json({
+                success: false,
+                message: 'Invalid payment method'
+            });
+        }
 
+        // Generate QR code
+        const qrCode = await QRCode.toDataURL(upiUrl);
+        
         res.json({
             success: true,
-            qrUrl: qrUrl
+            qrCode
         });
     } catch (error) {
         logger.error('Error generating QR code:', error);
-        res.status(500).json({ 
-            success: false, 
-            error: 'Failed to generate QR code' 
+        res.status(500).json({
+            success: false,
+            message: 'Failed to generate QR code'
         });
     }
 });
 
-// Registration route
+// Registration endpoint
 app.post('/api/register', upload.none(), async (req, res) => {
     try {
         logger.info('Starting registration process...');
