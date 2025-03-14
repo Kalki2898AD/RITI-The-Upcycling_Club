@@ -4,11 +4,15 @@ const { google } = require('googleapis');
 const multer = require('multer');
 const QRCode = require('qrcode');
 const path = require('path');
-const fs = require('fs');
 require('dotenv').config();
 
-// Enable OpenSSL legacy provider for Node.js crypto
-process.env.OPENSSL_LEGACY_PROVIDER = 'true';
+// Enable legacy OpenSSL provider
+const crypto = require('crypto');
+try {
+    crypto.setEngine('legacy');
+} catch (error) {
+    console.error('Failed to set crypto engine:', error);
+}
 
 const app = express();
 const upload = multer();
@@ -22,44 +26,40 @@ app.use(express.static(path.join(__dirname, 'public')));
 
 // Logger setup
 const logger = {
-    info: (message, data = '') => {
-        console.log('[INFO]', message, data);
-    },
-    error: (message, error = '') => {
-        console.error('[ERROR]', message, error);
-        if (error?.response?.data) {
-            console.error('[GOOGLE_API_ERROR]', error.response.data);
-        }
-    }
+    info: (...args) => console.log('[INFO]', ...args),
+    error: (...args) => console.error('[ERROR]', ...args)
 };
 
 // Google Sheets Configuration
 const SPREADSHEET_ID = '1wVWWOjFWaSqgR0pHCUvjwdxfscwxN2lK9uA_WW4ZrbU';
 
-// Service account credentials
-const serviceAccount = {
-    type: 'service_account',
-    project_id: 'zap-kitchen',
-    private_key: process.env.GOOGLE_SHEETS_PRIVATE_KEY?.replace(/\\n/g, '\n'),
-    client_email: 'ritiactivityserviceaccount@zap-kitchen.iam.gserviceaccount.com',
-    token_uri: 'https://oauth2.googleapis.com/token'
+// Create auth client
+const createAuth = () => {
+    try {
+        const privateKey = process.env.GOOGLE_SHEETS_PRIVATE_KEY?.replace(/\\n/g, '\n');
+        if (!privateKey) {
+            throw new Error('Private key is missing or invalid');
+        }
+
+        return new google.auth.JWT({
+            email: 'ritiactivityserviceaccount@zap-kitchen.iam.gserviceaccount.com',
+            key: privateKey,
+            scopes: ['https://www.googleapis.com/auth/spreadsheets']
+        });
+    } catch (error) {
+        logger.error('Auth creation error:', error);
+        throw error;
+    }
 };
 
-// Create auth client
-const auth = new google.auth.JWT(
-    serviceAccount.client_email,
-    null,
-    serviceAccount.private_key,
-    ['https://www.googleapis.com/auth/spreadsheets']
-);
-
-// Test connection immediately
+// Test connection on startup
 (async () => {
     try {
+        const auth = createAuth();
         await auth.authorize();
-        logger.info('Successfully authorized with Google Sheets');
+        logger.info('Successfully connected to Google Sheets API');
     } catch (error) {
-        logger.error('Authorization error:', error);
+        logger.error('Initial connection test failed:', error);
     }
 })();
 
@@ -68,45 +68,6 @@ const UPI_IDS = {
     gpay: 'rishikeshvarma9854@okaxis',
     phonepe: '6301852709@axl'
 };
-
-// QR code generation endpoint
-app.post('/qr-code', async (req, res) => {
-    try {
-        const { amount, paymentMethod } = req.body;
-        
-        if (!amount || !paymentMethod) {
-            return res.status(400).json({
-                success: false,
-                message: 'Amount and payment method are required'
-            });
-        }
-
-        let upiUrl;
-        if (paymentMethod === 'gpay') {
-            upiUrl = `upi://pay?pa=${UPI_IDS.gpay}&pn=RITI&am=${amount}&cu=INR`;
-        } else if (paymentMethod === 'phonepe') {
-            upiUrl = `upi://pay?pa=${UPI_IDS.phonepe}&pn=RITI&am=${amount}&cu=INR`;
-        } else {
-            return res.status(400).json({
-                success: false,
-                message: 'Invalid payment method'
-            });
-        }
-
-        const qrCode = await QRCode.toDataURL(upiUrl);
-        
-        res.json({
-            success: true,
-            qrCode
-        });
-    } catch (error) {
-        logger.error('Error generating QR code:', error);
-        res.status(500).json({
-            success: false,
-            message: 'Failed to generate QR code'
-        });
-    }
-});
 
 // Registration endpoint
 app.post('/api/register', upload.none(), async (req, res) => {
@@ -163,12 +124,10 @@ app.post('/api/register', upload.none(), async (req, res) => {
 
         // Write to Google Sheets
         try {
-            // Create new sheets instance for each request
-            const sheets = google.sheets({ version: 'v4', auth });
-            
-            // Verify auth token is still valid
+            const auth = createAuth();
             await auth.authorize();
             
+            const sheets = google.sheets({ version: 'v4', auth });
             const result = await sheets.spreadsheets.values.append({
                 spreadsheetId: SPREADSHEET_ID,
                 range: 'Sheet1',
@@ -184,30 +143,36 @@ app.post('/api/register', upload.none(), async (req, res) => {
                 updatedRange: result.data.updates?.updatedRange,
                 updatedRows: result.data.updates?.updatedRows
             });
-        } catch (sheetsError) {
-            logger.error('Google Sheets write error:', sheetsError);
-            throw new Error('Failed to save registration data. Please try again.');
-        }
 
-        // Generate QR code with participant details
-        const qrData = JSON.stringify({
-            id: participantId,
-            name: formData.name,
-            package: formData.selectedPackage
-        });
-
-        const qrCode = await QRCode.toDataURL(qrData);
-
-        res.json({
-            success: true,
-            message: 'Registration successful!',
-            participantData: {
+            // Generate QR code with participant details
+            const qrData = JSON.stringify({
                 id: participantId,
                 name: formData.name,
                 package: formData.selectedPackage
-            },
-            qrCode
-        });
+            });
+
+            const qrCode = await QRCode.toDataURL(qrData);
+
+            res.json({
+                success: true,
+                message: 'Registration successful!',
+                participantData: {
+                    id: participantId,
+                    name: formData.name,
+                    package: formData.selectedPackage
+                },
+                qrCode
+            });
+
+        } catch (sheetsError) {
+            logger.error('Google Sheets error details:', {
+                message: sheetsError.message,
+                code: sheetsError.code,
+                errors: sheetsError.errors,
+                response: sheetsError.response?.data
+            });
+            throw new Error('Failed to save registration data. Please try again.');
+        }
 
     } catch (error) {
         logger.error('Registration error:', error);
@@ -218,10 +183,49 @@ app.post('/api/register', upload.none(), async (req, res) => {
     }
 });
 
+// QR code generation endpoint
+app.post('/qr-code', async (req, res) => {
+    try {
+        const { amount, paymentMethod } = req.body;
+        
+        if (!amount || !paymentMethod) {
+            return res.status(400).json({
+                success: false,
+                message: 'Amount and payment method are required'
+            });
+        }
+
+        let upiUrl;
+        if (paymentMethod === 'gpay') {
+            upiUrl = `upi://pay?pa=${UPI_IDS.gpay}&pn=RITI&am=${amount}&cu=INR`;
+        } else if (paymentMethod === 'phonepe') {
+            upiUrl = `upi://pay?pa=${UPI_IDS.phonepe}&pn=RITI&am=${amount}&cu=INR`;
+        } else {
+            return res.status(400).json({
+                success: false,
+                message: 'Invalid payment method'
+            });
+        }
+
+        const qrCode = await QRCode.toDataURL(upiUrl);
+        
+        res.json({
+            success: true,
+            qrCode
+        });
+    } catch (error) {
+        logger.error('Error generating QR code:', error);
+        res.status(500).json({
+            success: false,
+            message: 'Failed to generate QR code'
+        });
+    }
+});
+
 // Get participant details
 app.get('/api/participant/:id', async (req, res) => {
     try {
-        const sheets = google.sheets({ version: 'v4', auth });
+        const sheets = google.sheets({ version: 'v4', auth: createAuth() });
         const response = await sheets.spreadsheets.values.get({
             spreadsheetId: SPREADSHEET_ID,
             range: 'Sheet1!A:L'
@@ -280,6 +284,11 @@ function handleError(error, operation) {
 // Serve index.html for the root route
 app.get('/', (req, res) => {
     res.sendFile(path.join(__dirname, 'public', 'index.html'));
+});
+
+// Serve favicon.ico
+app.get('/favicon.ico', (req, res) => {
+    res.sendFile(path.join(__dirname, 'public', 'favicon.ico'));
 });
 
 // Start server
