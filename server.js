@@ -6,7 +6,8 @@ const QRCode = require('qrcode');
 const path = require('path');
 require('dotenv').config();
 
-// Enable legacy OpenSSL provider
+// Set OpenSSL legacy provider
+process.env.NODE_OPTIONS = '--openssl-legacy-provider';
 process.env.OPENSSL_LEGACY_PROVIDER = 'true';
 
 const app = express();
@@ -28,42 +29,37 @@ const logger = {
 // Google Sheets Configuration
 const SPREADSHEET_ID = '1wVWWOjFWaSqgR0pHCUvjwdxfscwxN2lK9uA_WW4ZrbU';
 
-// Create auth client
-const getAuthClient = () => {
-    try {
-        const privateKey = process.env.GOOGLE_SHEETS_PRIVATE_KEY?.replace(/\\n/g, '\n');
-        if (!privateKey) {
-            throw new Error('Private key is missing');
-        }
+// Format private key properly
+const privateKey = process.env.GOOGLE_SHEETS_PRIVATE_KEY?.replace(/\\n/g, '\n');
+if (!privateKey) {
+    logger.error('Private key is missing');
+    process.exit(1);
+}
 
-        return new google.auth.JWT({
-            email: 'ritiactivityserviceaccount@zap-kitchen.iam.gserviceaccount.com',
-            key: privateKey,
-            scopes: ['https://www.googleapis.com/auth/spreadsheets']
-        });
-    } catch (error) {
-        logger.error('Auth client creation error:', error);
-        throw error;
-    }
-};
+// Create auth client using JWT directly (from working memory)
+const auth = new google.auth.JWT(
+    'ritiactivityserviceaccount@zap-kitchen.iam.gserviceaccount.com',
+    null,
+    privateKey,
+    ['https://www.googleapis.com/auth/spreadsheets']
+);
 
 // Test connection on startup
 (async () => {
     try {
-        const auth = getAuthClient();
         await auth.authorize();
         logger.info('Successfully authorized with Google Sheets');
 
         const sheets = google.sheets({ version: 'v4', auth });
-        await sheets.spreadsheets.values.get({
+        const response = await sheets.spreadsheets.values.get({
             spreadsheetId: SPREADSHEET_ID,
             range: 'Sheet1!A1:A1'
         });
-        logger.info('Successfully accessed Google Sheet');
+        logger.info('Successfully accessed Google Sheet:', response.data);
     } catch (error) {
-        logger.error('Initial connection test failed:', {
+        logger.error('Google Sheets connection error:', {
             message: error.message,
-            stack: error.stack,
+            code: error.code,
             response: error.response?.data
         });
     }
@@ -130,10 +126,9 @@ app.post('/api/register', upload.none(), async (req, res) => {
 
         // Write to Google Sheets
         try {
-            // Get fresh auth client for each request
-            const auth = getAuthClient();
+            // Re-authorize before write
             await auth.authorize();
-            logger.info('Successfully authorized for write operation');
+            logger.info('Successfully re-authorized for write operation');
 
             const sheets = google.sheets({ version: 'v4', auth });
             const result = await sheets.spreadsheets.values.append({
@@ -143,10 +138,6 @@ app.post('/api/register', upload.none(), async (req, res) => {
                 insertDataOption: 'INSERT_ROWS',
                 resource: { values }
             });
-
-            if (!result.data) {
-                throw new Error('No response from Google Sheets API');
-            }
 
             logger.info('Successfully wrote to Google Sheets:', {
                 updatedRange: result.data.updates?.updatedRange,
@@ -176,9 +167,7 @@ app.post('/api/register', upload.none(), async (req, res) => {
         } catch (sheetsError) {
             logger.error('Google Sheets write error:', {
                 message: sheetsError.message,
-                stack: sheetsError.stack,
                 code: sheetsError.code,
-                errors: sheetsError.errors,
                 response: sheetsError.response?.data
             });
             throw new Error(`Failed to save registration data: ${sheetsError.message}`);
@@ -235,7 +224,7 @@ app.post('/qr-code', async (req, res) => {
 // Get participant details
 app.get('/api/participant/:id', async (req, res) => {
     try {
-        const client = await getAuthClient();
+        const client = await auth.authorize();
         const sheets = google.sheets({ version: 'v4', auth: client });
         const response = await sheets.spreadsheets.values.get({
             spreadsheetId: SPREADSHEET_ID,
