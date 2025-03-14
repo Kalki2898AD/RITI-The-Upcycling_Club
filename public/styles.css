@@ -1,0 +1,94 @@
+/* Custom styles */
+body {
+    font-family: 'Inter', system-ui, -apple-system, sans-serif;
+}
+
+.container {
+    max-width: 1200px;
+}
+
+/* Scanner customization */
+#reader {
+    border: 2px solid #22c55e;
+    border-radius: 8px;
+    overflow: hidden;
+}
+
+#reader video {
+    width: 100% !important;
+    border-radius: 6px;
+}
+
+/* Payment options animation */
+.payment-option {
+    transition: all 0.3s ease;
+    transform: scale(1);
+}
+
+.payment-option:hover {
+    transform: scale(1.05);
+}
+
+/* Form styling */
+input, select {
+    transition: border-color 0.2s ease;
+}
+
+input:focus, select:focus {
+    outline: none;
+    border-color: #22c55e;
+    ring: 2px solid #22c55e;
+}
+
+/* Success modal animation */
+@keyframes slideIn {
+    from {
+        transform: translateY(-100px);
+        opacity: 0;
+    }
+    to {
+        transform: translateY(0);
+        opacity: 1;
+    }
+}
+
+#success-modal > div {
+    animation: slideIn 0.3s ease-out;
+}
+
+/* Loading spinner */
+.loading-spinner {
+    border: 3px solid #f3f3f3;
+    border-radius: 50%;
+    border-top: 3px solid #22c55e;
+    width: 24px;
+    height: 24px;
+    animation: spin 1s linear infinite;
+}
+
+@keyframes spin {
+    0% { transform: rotate(0deg); }
+    100% { transform: rotate(360deg); }
+}
+
+/* Admin dashboard styles */
+.admin-table {
+    width: 100%;
+    border-collapse: collapse;
+}
+
+.admin-table th,
+.admin-table td {
+    padding: 12px;
+    text-align: left;
+    border-bottom: 1px solid #e5e7eb;
+}
+
+.admin-table th {
+    background-color: #f9fafb;
+    font-weight: 600;
+}
+
+.admin-table tr:hover {
+    background-color: #f3f4f6;
+}

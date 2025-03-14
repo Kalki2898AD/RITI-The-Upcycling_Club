@@ -1,0 +1,112 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Riti - Participant Verification</title>
+    <link href="https://cdn.jsdelivr.net/npm/tailwindcss@2.2.19/dist/tailwind.min.css" rel="stylesheet">
+    <link href="styles.css" rel="stylesheet">
+    <script src="https://unpkg.com/html5-qrcode"></script>
+</head>
+<body class="bg-gradient-to-br from-green-50 to-green-100 min-h-screen">
+    <div class="container mx-auto px-4 py-8">
+        <!-- Header -->
+        <header class="text-center mb-12">
+            <h1 class="text-4xl font-bold text-green-800 mb-2">Participant Verification</h1>
+            <p class="text-gray-600">Scan participant QR code to verify registration</p>
+        </header>
+
+        <!-- Scanner Section -->
+        <div id="scanner-section" class="bg-white rounded-lg shadow-lg p-6 mb-8">
+            <h2 class="text-2xl font-semibold text-green-700 mb-4">Scan Participant QR Code</h2>
+            <div id="reader" class="mx-auto" style="max-width: 500px;"></div>
+        </div>
+
+        <!-- Participant Details -->
+        <div id="participant-details" class="bg-white rounded-lg shadow-lg p-6 mb-8 hidden">
+            <div class="success-animation mb-6">
+                <svg class="checkmark" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 52 52">
+                    <circle class="checkmark__circle" cx="26" cy="26" r="25" fill="none"/>
+                    <path class="checkmark__check" fill="none" d="M14.1 27.2l7.1 7.2 16.7-16.8"/>
+                </svg>
+            </div>
+            <h2 class="text-2xl font-semibold text-green-700 mb-4">Participant Details</h2>
+            <div class="space-y-4">
+                <div class="grid grid-cols-2 gap-4">
+                    <div>
+                        <label class="block text-gray-600">Games Package:</label>
+                        <div id="participant-games" class="font-semibold text-lg"></div>
+                    </div>
+                    <div>
+                        <label class="block text-gray-600">Amount:</label>
+                        <div id="participant-amount" class="font-semibold text-lg"></div>
+                    </div>
+                    <div>
+                        <label class="block text-gray-600">Payment Method:</label>
+                        <div id="participant-payment" class="font-semibold text-lg"></div>
+                    </div>
+                    <div>
+                        <label class="block text-gray-600">Payment Status:</label>
+                        <div id="participant-status" class="font-semibold text-lg"></div>
+                    </div>
+                    <div>
+                        <label class="block text-gray-600">Registration Date:</label>
+                        <div id="participant-date" class="font-semibold text-lg"></div>
+                    </div>
+                </div>
+                <div class="mt-6">
+                    <button id="verify-another" class="bg-green-500 hover:bg-green-600 text-white px-6 py-2 rounded">
+                        Verify Another Participant
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <style>
+        .success-animation {
+            display: flex;
+            justify-content: center;
+            align-items: center;
+        }
+        .checkmark {
+            width: 80px;
+            height: 80px;
+            border-radius: 50%;
+            display: block;
+            stroke-width: 2;
+            stroke: #4BB543;
+            stroke-miterlimit: 10;
+            box-shadow: inset 0px 0px 0px #4BB543;
+            animation: fill .4s ease-in-out .4s forwards, scale .3s ease-in-out .9s both;
+        }
+        .checkmark__circle {
+            stroke-dasharray: 166;
+            stroke-dashoffset: 166;
+            stroke-width: 2;
+            stroke-miterlimit: 10;
+            stroke: #4BB543;
+            fill: none;
+            animation: stroke .6s cubic-bezier(0.650, 0.000, 0.450, 1.000) forwards;
+        }
+        .checkmark__check {
+            transform-origin: 50% 50%;
+            stroke-dasharray: 48;
+            stroke-dashoffset: 48;
+            animation: stroke .3s cubic-bezier(0.650, 0.000, 0.450, 1.000) .8s forwards;
+        }
+        @keyframes stroke {
+            100% { stroke-dashoffset: 0; }
+        }
+        @keyframes scale {
+            0%, 100% { transform: none; }
+            50% { transform: scale3d(1.1, 1.1, 1); }
+        }
+        @keyframes fill {
+            100% { box-shadow: inset 0px 0px 0px 30px #4BB543; }
+        }
+    </style>
+
+    <script src="admin.js"></script>
+</body>
+</html>

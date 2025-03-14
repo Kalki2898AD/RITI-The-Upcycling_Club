@@ -1,0 +1,306 @@
+const express = require('express');
+const { google } = require('googleapis');
+const cors = require('cors');
+const path = require('path');
+const QRCode = require('qrcode');
+const logger = require('./utils/logger');
+require('dotenv').config();
+const multer = require('multer');
+const upload = multer();
+
+const app = express();
+const port = process.env.PORT || 3000;
+
+app.use(cors());
+app.use(express.json());
+app.use(express.urlencoded({ extended: true }));
+app.use(express.static('public'));
+
+// Error handler function
+function handleError(error, operation) {
+    logger.error(`Error during ${operation}:`, error);
+    return {
+        success: false,
+        message: `Operation failed: ${operation}`,
+        details: error.message,
+        stack: process.env.NODE_ENV !== 'production' ? error.stack : undefined
+    };
+}
+
+// Google Sheets Configuration
+const SCOPES = ['https://www.googleapis.com/auth/spreadsheets'];
+const credentials = require('./credentials.json');
+
+// Create auth client
+const auth = new google.auth.JWT(
+    credentials.client_email,
+    null,
+    credentials.private_key,
+    SCOPES
+);
+
+let sheets;
+async function initializeGoogleSheets() {
+    try {
+        sheets = google.sheets({ version: 'v4', auth });
+        logger.info('Successfully initialized Google Sheets client');
+    } catch (error) {
+        logger.error('Error initializing Google Sheets:', error);
+        throw error;
+    }
+}
+
+// Initialize Google Sheets client
+initializeGoogleSheets().catch(error => {
+    logger.error('Failed to initialize Google Sheets:', error);
+});
+
+// Use the spreadsheet ID from the configuration
+const spreadsheetId = '1wVWWOjFWaSqgR0pHCUvjwdxfscwxN2lK9uA_WW4ZrbU';
+
+// Test Google Sheets connection
+async function testGoogleSheetsConnection() {
+    try {
+        logger.info('Testing Google Sheets connection...');
+        logger.info(`Using spreadsheet ID: ${spreadsheetId}`);
+        logger.info(`Using service account: ${credentials.client_email}`);
+
+        // First, try to get the spreadsheet info
+        logger.info('Attempting to get spreadsheet info...');
+        const response = await sheets.spreadsheets.get({
+            spreadsheetId
+        });
+
+        logger.info('Successfully connected to Google Sheets');
+        logger.info(`Spreadsheet title: ${response.data.properties.title}`);
+
+        // Then, try to write to the sheet
+        logger.info('Attempting to write test data...');
+        const writeResponse = await sheets.spreadsheets.values.append({
+            spreadsheetId,
+            range: 'Sheet1!A:A',
+            valueInputOption: 'RAW',
+            resource: {
+                values: [['Test connection - ' + new Date().toISOString()]]
+            }
+        });
+        logger.info('Successfully wrote test data to sheet:', writeResponse.data);
+
+    } catch (error) {
+        logger.error('Error connecting to Google Sheets:', error);
+        if (error.message.includes('permission')) {
+            logger.error('Permission error detected. Please verify:');
+            logger.error(`1. The service account email is correct: ${credentials.client_email}`);
+            logger.error('2. The Google Sheet is shared with the service account');
+            logger.error('3. The service account has Editor access');
+        }
+        if (error.message.includes('not found')) {
+            logger.error('Spreadsheet not found. Please verify:');
+            logger.error(`1. The spreadsheet ID is correct: ${spreadsheetId}`);
+            logger.error('2. The spreadsheet exists and is accessible');
+        }
+        logger.error('Full error details:', {
+            message: error.message,
+            code: error.code,
+            errors: error.errors,
+            stack: error.stack
+        });
+    }
+}
+
+// Test connection on startup with a delay to ensure proper initialization
+setTimeout(() => {
+    testGoogleSheetsConnection().catch(error => {
+        logger.error('Failed to test Google Sheets connection:', error);
+    });
+}, 1000);
+
+// UPI IDs configuration
+const UPI_IDS = {
+    gpay: 'rishikeshvarma9854@okaxis',
+    phonepe: '6301852709@axl'
+};
+
+// QR code generation route
+app.post('/qr-code', async (req, res) => {
+    try {
+        const { amount, method } = req.body;
+        
+        if (!amount || !method || !UPI_IDS[method]) {
+            return res.status(400).json({ 
+                success: false, 
+                error: 'Invalid payment details' 
+            });
+        }
+
+        const upiUrl = `upi://pay?pa=${UPI_IDS[method]}&pn=RITI_CLUB&am=${amount}&cu=INR`;
+        const qrUrl = await QRCode.toDataURL(upiUrl);
+
+        res.json({
+            success: true,
+            qrUrl: qrUrl
+        });
+    } catch (error) {
+        logger.error('Error generating QR code:', error);
+        res.status(500).json({ 
+            success: false, 
+            error: 'Failed to generate QR code' 
+        });
+    }
+});
+
+// Registration route
+app.post('/api/register', upload.none(), async (req, res) => {
+    try {
+        logger.info('Starting registration process...');
+        logger.info('Raw request body:', req.body);
+
+        // Extract form data
+        const formData = {
+            name: req.body.name,
+            hallTicket: req.body.hallTicket,
+            mobile: req.body.mobile,
+            year: req.body.year,
+            branch: req.body.branch,
+            section: req.body.section,
+            selectedPackage: req.body.selectedPackage,
+            paymentMethod: req.body.paymentMethod,
+            amount: req.body.amount,
+            transactionId: req.body.transactionId || 'N/A'
+        };
+
+        logger.info('Parsed form data:', formData);
+
+        // Validate required fields
+        const requiredFields = ['name', 'hallTicket', 'mobile', 'year', 'branch', 'section', 'selectedPackage', 'paymentMethod', 'amount'];
+        const missingFields = requiredFields.filter(field => !formData[field]);
+        
+        if (missingFields.length > 0) {
+            logger.error('Missing required fields:', missingFields);
+            return res.status(400).json({
+                success: false,
+                message: `Missing required fields: ${missingFields.join(', ')}`
+            });
+        }
+
+        // Validate mobile number
+        if (!/^\d{10}$/.test(formData.mobile)) {
+            logger.error('Invalid mobile number:', formData.mobile);
+            return res.status(400).json({
+                success: false,
+                message: 'Mobile number must be 10 digits'
+            });
+        }
+
+        // Validate transaction ID for online payments
+        if (formData.paymentMethod !== 'CASH' && (!formData.transactionId || !/^\d{12}$/.test(formData.transactionId))) {
+            logger.error('Invalid UTR number:', {
+                paymentMethod: formData.paymentMethod,
+                transactionId: formData.transactionId
+            });
+            return res.status(400).json({
+                success: false,
+                message: 'Please enter a valid 12-digit UTR number'
+            });
+        }
+
+        // Generate unique participant ID
+        const participantId = Date.now().toString();
+        
+        // Create QR code data
+        const qrData = {
+            id: participantId,
+            name: formData.name,
+            hallTicket: formData.hallTicket,
+            package: formData.selectedPackage,
+            payment: formData.paymentMethod
+        };
+        
+        // Generate QR code
+        const qrCode = await QRCode.toDataURL(JSON.stringify(qrData));
+        
+        // Add to Google Sheets
+        const values = [
+            [
+                participantId, // ID
+                formData.name,
+                formData.hallTicket,
+                formData.mobile,
+                formData.year,
+                formData.branch,
+                formData.section,
+                formData.selectedPackage,
+                formData.paymentMethod,
+                formData.amount,
+                formData.transactionId,
+                new Date().toISOString(), // Registration Date
+                formData.paymentMethod === 'CASH' ? 'Pending' : 'Completed' // Payment Status
+            ]
+        ];
+
+        await sheets.spreadsheets.values.append({
+            spreadsheetId,
+            range: 'Sheet1!A:M',
+            valueInputOption: 'RAW',
+            resource: { values }
+        });
+
+        logger.info('Registration data written to Google Sheets');
+        res.json({
+            success: true,
+            message: 'Registration successful',
+            qrCode: qrCode,
+            participantData: qrData
+        });
+
+    } catch (error) {
+        logger.error('Error during registration:', error);
+        res.status(500).json(handleError(error, 'registration'));
+    }
+});
+
+// Get participant details
+app.get('/api/participant/:id', async (req, res) => {
+    try {
+        const response = await sheets.spreadsheets.values.get({
+            spreadsheetId,
+            range: 'Sheet1!A:L'
+        });
+
+        const rows = response.data.values || [];
+        const participant = rows.find(row => row[0] === req.params.id);
+
+        if (participant) {
+            res.json({
+                success: true,
+                participant: {
+                    id: participant[0],
+                    name: participant[1],
+                    hallTicket: participant[2],
+                    year: participant[3],
+                    branch: participant[4],
+                    section: participant[5],
+                    amount: participant[6],
+                    games: participant[7],
+                    paymentMethod: participant[8],
+                    transactionId: participant[9],
+                    registrationDate: participant[10],
+                    paymentStatus: participant[11]
+                }
+            });
+        } else {
+            res.status(404).json({ 
+                success: false, 
+                message: 'Participant not found' 
+            });
+        }
+    } catch (error) {
+        const errorResponse = handleError(error, 'fetching participant details');
+        res.status(500).json(errorResponse);
+    }
+});
+
+// Start server
+app.listen(port, () => {
+    logger.info(`Server running at http://localhost:${port}`);
+});
