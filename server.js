@@ -27,93 +27,44 @@ function handleError(error, operation) {
     };
 }
 
-// Google Sheets Configuration
-const SCOPES = ['https://www.googleapis.com/auth/spreadsheets'];
-const credentials = require('./credentials.json');
+// Handle private key formatting for Vercel
+const privateKey = process.env.GOOGLE_SHEETS_PRIVATE_KEY 
+    ? process.env.GOOGLE_SHEETS_PRIVATE_KEY.replace(/\\n/g, '\n')
+    : undefined;
 
-// Create auth client
-const auth = new google.auth.JWT(
-    credentials.client_email,
-    null,
-    credentials.private_key,
-    SCOPES
-);
-
-let sheets;
-async function initializeGoogleSheets() {
-    try {
-        sheets = google.sheets({ version: 'v4', auth });
-        logger.info('Successfully initialized Google Sheets client');
-    } catch (error) {
-        logger.error('Error initializing Google Sheets:', error);
-        throw error;
-    }
-}
-
-// Initialize Google Sheets client
-initializeGoogleSheets().catch(error => {
-    logger.error('Failed to initialize Google Sheets:', error);
+const auth = new google.auth.GoogleAuth({
+    credentials: {
+        client_email: process.env.GOOGLE_SHEETS_CLIENT_EMAIL,
+        private_key: privateKey
+    },
+    scopes: ['https://www.googleapis.com/auth/spreadsheets']
 });
 
-// Use the spreadsheet ID from the configuration
+// Initialize Google Sheets
+const sheets = google.sheets({ version: 'v4', auth });
 const spreadsheetId = '1wVWWOjFWaSqgR0pHCUvjwdxfscwxN2lK9uA_WW4ZrbU';
 
-// Test Google Sheets connection
-async function testGoogleSheetsConnection() {
+// Test Google Sheets connection on startup
+(async () => {
     try {
         logger.info('Testing Google Sheets connection...');
         logger.info(`Using spreadsheet ID: ${spreadsheetId}`);
-        logger.info(`Using service account: ${credentials.client_email}`);
-
-        // First, try to get the spreadsheet info
+        logger.info(`Using service account: ${process.env.GOOGLE_SHEETS_CLIENT_EMAIL}`);
+        
         logger.info('Attempting to get spreadsheet info...');
         const response = await sheets.spreadsheets.get({
-            spreadsheetId
+            spreadsheetId,
+            fields: 'properties.title'
         });
-
+        
         logger.info('Successfully connected to Google Sheets');
         logger.info(`Spreadsheet title: ${response.data.properties.title}`);
-
-        // Then, try to write to the sheet
-        logger.info('Attempting to write test data...');
-        const writeResponse = await sheets.spreadsheets.values.append({
-            spreadsheetId,
-            range: 'Sheet1!A:A',
-            valueInputOption: 'RAW',
-            resource: {
-                values: [['Test connection - ' + new Date().toISOString()]]
-            }
-        });
-        logger.info('Successfully wrote test data to sheet:', writeResponse.data);
-
+        
     } catch (error) {
         logger.error('Error connecting to Google Sheets:', error);
-        if (error.message.includes('permission')) {
-            logger.error('Permission error detected. Please verify:');
-            logger.error(`1. The service account email is correct: ${credentials.client_email}`);
-            logger.error('2. The Google Sheet is shared with the service account');
-            logger.error('3. The service account has Editor access');
-        }
-        if (error.message.includes('not found')) {
-            logger.error('Spreadsheet not found. Please verify:');
-            logger.error(`1. The spreadsheet ID is correct: ${spreadsheetId}`);
-            logger.error('2. The spreadsheet exists and is accessible');
-        }
-        logger.error('Full error details:', {
-            message: error.message,
-            code: error.code,
-            errors: error.errors,
-            stack: error.stack
-        });
+        // Don't exit process on error, just log it
     }
-}
-
-// Test connection on startup with a delay to ensure proper initialization
-setTimeout(() => {
-    testGoogleSheetsConnection().catch(error => {
-        logger.error('Failed to test Google Sheets connection:', error);
-    });
-}, 1000);
+})();
 
 // UPI IDs configuration
 const UPI_IDS = {
