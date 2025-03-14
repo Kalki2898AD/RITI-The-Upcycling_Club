@@ -113,26 +113,10 @@ app.post('/qr-code', async (req, res) => {
 // Registration endpoint
 app.post('/api/register', upload.none(), async (req, res) => {
     try {
-        logger.info('Starting registration process...');
-        logger.info('Raw request body:', req.body);
+        const formData = req.body;
+        logger.info('Received registration data:', formData);
 
-        // Extract form data
-        const formData = {
-            name: req.body.name,
-            hallTicket: req.body.hallTicket,
-            mobile: req.body.mobile,
-            year: req.body.year,
-            branch: req.body.branch,
-            section: req.body.section,
-            selectedPackage: req.body.selectedPackage,
-            paymentMethod: req.body.paymentMethod,
-            amount: req.body.amount,
-            transactionId: req.body.transactionId || 'N/A'
-        };
-
-        logger.info('Parsed form data:', formData);
-
-        // Validate required fields
+        // Basic validation
         const requiredFields = ['name', 'hallTicket', 'mobile', 'year', 'branch', 'section', 'selectedPackage', 'paymentMethod', 'amount'];
         const missingFields = requiredFields.filter(field => !formData[field]);
         
@@ -146,19 +130,14 @@ app.post('/api/register', upload.none(), async (req, res) => {
 
         // Validate mobile number
         if (!/^\d{10}$/.test(formData.mobile)) {
-            logger.error('Invalid mobile number:', formData.mobile);
             return res.status(400).json({
                 success: false,
-                message: 'Mobile number must be 10 digits'
+                message: 'Invalid mobile number'
             });
         }
 
         // Validate transaction ID for online payments
         if (formData.paymentMethod !== 'CASH' && (!formData.transactionId || !/^\d{12}$/.test(formData.transactionId))) {
-            logger.error('Invalid UTR number:', {
-                paymentMethod: formData.paymentMethod,
-                transactionId: formData.transactionId
-            });
             return res.status(400).json({
                 success: false,
                 message: 'Please enter a valid 12-digit UTR number'
@@ -166,24 +145,13 @@ app.post('/api/register', upload.none(), async (req, res) => {
         }
 
         // Generate unique participant ID
-        const participantId = Date.now().toString();
-        
-        // Create QR code data
-        const qrData = {
-            id: participantId,
-            name: formData.name,
-            hallTicket: formData.hallTicket,
-            package: formData.selectedPackage,
-            payment: formData.paymentMethod
-        };
-        
-        // Generate QR code
-        const qrCode = await QRCode.toDataURL(JSON.stringify(qrData));
-        
-        // Add to Google Sheets
+        const timestamp = new Date().getTime();
+        const participantId = `RITI${timestamp}`;
+
+        // Prepare data for Google Sheets
         const values = [
             [
-                participantId, // ID
+                participantId,
                 formData.name,
                 formData.hallTicket,
                 formData.mobile,
@@ -193,30 +161,46 @@ app.post('/api/register', upload.none(), async (req, res) => {
                 formData.selectedPackage,
                 formData.paymentMethod,
                 formData.amount,
-                formData.transactionId,
-                new Date().toISOString(), // Registration Date
-                formData.paymentMethod === 'CASH' ? 'Pending' : 'Completed' // Payment Status
+                formData.transactionId || 'N/A',
+                new Date().toISOString()
             ]
         ];
 
+        // Write to Google Sheets
         await sheets.spreadsheets.values.append({
             spreadsheetId,
-            range: 'Sheet1!A:M',
+            range: 'Sheet1!A:L',
             valueInputOption: 'RAW',
             resource: { values }
         });
 
-        logger.info('Registration data written to Google Sheets');
+        // Generate QR code with participant details
+        const qrData = JSON.stringify({
+            id: participantId,
+            name: formData.name,
+            package: formData.selectedPackage
+        });
+
+        const qrCode = await QRCode.toDataURL(qrData);
+
+        // Send success response
         res.json({
             success: true,
-            message: 'Registration successful',
-            qrCode: qrCode,
-            participantData: qrData
+            message: 'Registration successful!',
+            participantData: {
+                id: participantId,
+                name: formData.name,
+                package: formData.selectedPackage
+            },
+            qrCode
         });
 
     } catch (error) {
-        logger.error('Error during registration:', error);
-        res.status(500).json(handleError(error, 'registration'));
+        logger.error('Registration error:', error);
+        res.status(500).json({
+            success: false,
+            message: 'Registration failed. Please try again.'
+        });
     }
 });
 

@@ -221,9 +221,9 @@ document.addEventListener('DOMContentLoaded', function() {
             
             if (result.success) {
                 // Display participant details
-                document.getElementById('participant-name').textContent = `Name: ${formData.get('name')}`;
+                document.getElementById('participant-name').textContent = `Name: ${result.participantData.name}`;
                 document.getElementById('participant-id').textContent = `ID: ${result.participantData.id}`;
-                document.getElementById('participant-package').textContent = `Package: ${formData.get('selectedPackage')}`;
+                document.getElementById('participant-package').textContent = `Package: ${result.participantData.package}`;
 
                 // Display QR code
                 const qrContainer = document.getElementById('participant-qr');
@@ -265,11 +265,11 @@ document.addEventListener('DOMContentLoaded', function() {
                 // Show success modal
                 document.getElementById('success-modal').classList.remove('hidden');
             } else {
-                alert(result.message || 'Registration failed. Please try again.');
+                throw new Error(result.message || 'Registration failed');
             }
         } catch (error) {
+            alert(error.message || 'Registration failed. Please try again.');
             console.error('Registration error:', error);
-            alert('An error occurred during registration. Please try again.');
         }
     });
 });
