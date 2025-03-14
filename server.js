@@ -6,9 +6,8 @@ const QRCode = require('qrcode');
 const path = require('path');
 require('dotenv').config();
 
-// Set OpenSSL legacy provider
-process.env.NODE_OPTIONS = '--openssl-legacy-provider';
-process.env.OPENSSL_LEGACY_PROVIDER = 'true';
+// Set OpenSSL configuration before anything else
+process.env.OPENSSL_CONF = '/dev/null';
 
 const app = express();
 const upload = multer();
@@ -29,28 +28,35 @@ const logger = {
 // Google Sheets Configuration
 const SPREADSHEET_ID = '1wVWWOjFWaSqgR0pHCUvjwdxfscwxN2lK9uA_WW4ZrbU';
 
-// Format private key properly
-const privateKey = process.env.GOOGLE_SHEETS_PRIVATE_KEY?.replace(/\\n/g, '\n');
-if (!privateKey) {
-    logger.error('Private key is missing');
-    process.exit(1);
-}
+// Create auth client
+const getAuthClient = () => {
+    try {
+        const privateKey = process.env.GOOGLE_SHEETS_PRIVATE_KEY?.replace(/\\n/g, '\n');
+        if (!privateKey) {
+            throw new Error('Private key is missing');
+        }
 
-// Create auth client using JWT directly (from working memory)
-const auth = new google.auth.JWT(
-    'ritiactivityserviceaccount@zap-kitchen.iam.gserviceaccount.com',
-    null,
-    privateKey,
-    ['https://www.googleapis.com/auth/spreadsheets']
-);
+        return new google.auth.GoogleAuth({
+            credentials: {
+                client_email: 'ritiactivityserviceaccount@zap-kitchen.iam.gserviceaccount.com',
+                private_key: privateKey
+            },
+            scopes: ['https://www.googleapis.com/auth/spreadsheets']
+        });
+    } catch (error) {
+        logger.error('Auth client creation error:', error);
+        throw error;
+    }
+};
 
 // Test connection on startup
 (async () => {
     try {
-        await auth.authorize();
-        logger.info('Successfully authorized with Google Sheets');
+        const auth = await getAuthClient();
+        const client = await auth.getClient();
+        logger.info('Successfully created auth client');
 
-        const sheets = google.sheets({ version: 'v4', auth });
+        const sheets = google.sheets({ version: 'v4', auth: client });
         const response = await sheets.spreadsheets.values.get({
             spreadsheetId: SPREADSHEET_ID,
             range: 'Sheet1!A1:A1'
@@ -126,11 +132,11 @@ app.post('/api/register', upload.none(), async (req, res) => {
 
         // Write to Google Sheets
         try {
-            // Re-authorize before write
-            await auth.authorize();
-            logger.info('Successfully re-authorized for write operation');
+            const auth = await getAuthClient();
+            const client = await auth.getClient();
+            logger.info('Successfully created auth client for write operation');
 
-            const sheets = google.sheets({ version: 'v4', auth });
+            const sheets = google.sheets({ version: 'v4', auth: client });
             const result = await sheets.spreadsheets.values.append({
                 spreadsheetId: SPREADSHEET_ID,
                 range: 'Sheet1',
@@ -224,7 +230,8 @@ app.post('/qr-code', async (req, res) => {
 // Get participant details
 app.get('/api/participant/:id', async (req, res) => {
     try {
-        const client = await auth.authorize();
+        const auth = await getAuthClient();
+        const client = await auth.getClient();
         const sheets = google.sheets({ version: 'v4', auth: client });
         const response = await sheets.spreadsheets.values.get({
             spreadsheetId: SPREADSHEET_ID,
