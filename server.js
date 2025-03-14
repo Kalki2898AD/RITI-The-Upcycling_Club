@@ -33,30 +33,24 @@ const logger = {
 // Google Sheets Configuration
 const SPREADSHEET_ID = '1wVWWOjFWaSqgR0pHCUvjwdxfscwxN2lK9uA_WW4ZrbU';
 
-// Format private key properly
-const PRIVATE_KEY = process.env.GOOGLE_SHEETS_PRIVATE_KEY
-    ? process.env.GOOGLE_SHEETS_PRIVATE_KEY.replace(/\\n/g, '\n')
-    : '';
+// Create JWT auth client
+const auth = new google.auth.JWT(
+    'ritiactivityserviceaccount@zap-kitchen.iam.gserviceaccount.com',
+    null,
+    process.env.GOOGLE_SHEETS_PRIVATE_KEY?.replace(/\\n/g, '\n'),
+    ['https://www.googleapis.com/auth/spreadsheets']
+);
 
-// Create auth client
-const auth = new google.auth.GoogleAuth({
-    credentials: {
-        type: 'service_account',
-        project_id: 'zap-kitchen',
-        private_key: PRIVATE_KEY,
-        client_email: 'ritiactivityserviceaccount@zap-kitchen.iam.gserviceaccount.com',
-    },
-    scopes: ['https://www.googleapis.com/auth/spreadsheets']
-});
+// Initialize sheets API
+const sheets = google.sheets({ version: 'v4', auth });
 
 // Test connection on startup
 (async () => {
     try {
-        const client = await auth.getClient();
+        await auth.authorize();
         logger.info('Successfully connected to Google Sheets API');
         
         // Test spreadsheet access
-        const sheets = google.sheets({ version: 'v4', auth: client });
         await sheets.spreadsheets.values.get({
             spreadsheetId: SPREADSHEET_ID,
             range: 'Sheet1!A1:A1'
@@ -128,8 +122,8 @@ app.post('/api/register', upload.none(), async (req, res) => {
 
         // Write to Google Sheets
         try {
-            const client = await auth.getClient();
-            const sheets = google.sheets({ version: 'v4', auth: client });
+            // Re-authorize before each write
+            await auth.authorize();
             
             const result = await sheets.spreadsheets.values.append({
                 spreadsheetId: SPREADSHEET_ID,
