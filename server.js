@@ -33,33 +33,37 @@ const logger = {
 // Google Sheets Configuration
 const SPREADSHEET_ID = '1wVWWOjFWaSqgR0pHCUvjwdxfscwxN2lK9uA_WW4ZrbU';
 
-// Create auth client
-const createAuth = () => {
-    try {
-        const privateKey = process.env.GOOGLE_SHEETS_PRIVATE_KEY?.replace(/\\n/g, '\n');
-        if (!privateKey) {
-            throw new Error('Private key is missing or invalid');
-        }
+// Format private key properly
+const PRIVATE_KEY = process.env.GOOGLE_SHEETS_PRIVATE_KEY
+    ? process.env.GOOGLE_SHEETS_PRIVATE_KEY.replace(/\\n/g, '\n')
+    : '';
 
-        return new google.auth.JWT({
-            email: 'ritiactivityserviceaccount@zap-kitchen.iam.gserviceaccount.com',
-            key: privateKey,
-            scopes: ['https://www.googleapis.com/auth/spreadsheets']
-        });
-    } catch (error) {
-        logger.error('Auth creation error:', error);
-        throw error;
-    }
-};
+// Create auth client
+const auth = new google.auth.GoogleAuth({
+    credentials: {
+        type: 'service_account',
+        project_id: 'zap-kitchen',
+        private_key: PRIVATE_KEY,
+        client_email: 'ritiactivityserviceaccount@zap-kitchen.iam.gserviceaccount.com',
+    },
+    scopes: ['https://www.googleapis.com/auth/spreadsheets']
+});
 
 // Test connection on startup
 (async () => {
     try {
-        const auth = createAuth();
-        await auth.authorize();
+        const client = await auth.getClient();
         logger.info('Successfully connected to Google Sheets API');
+        
+        // Test spreadsheet access
+        const sheets = google.sheets({ version: 'v4', auth: client });
+        await sheets.spreadsheets.values.get({
+            spreadsheetId: SPREADSHEET_ID,
+            range: 'Sheet1!A1:A1'
+        });
+        logger.info('Successfully accessed Google Sheet');
     } catch (error) {
-        logger.error('Initial connection test failed:', error);
+        logger.error('Google Sheets connection error:', error);
     }
 })();
 
@@ -124,14 +128,14 @@ app.post('/api/register', upload.none(), async (req, res) => {
 
         // Write to Google Sheets
         try {
-            const auth = createAuth();
-            await auth.authorize();
+            const client = await auth.getClient();
+            const sheets = google.sheets({ version: 'v4', auth: client });
             
-            const sheets = google.sheets({ version: 'v4', auth });
             const result = await sheets.spreadsheets.values.append({
                 spreadsheetId: SPREADSHEET_ID,
                 range: 'Sheet1',
                 valueInputOption: 'USER_ENTERED',
+                insertDataOption: 'INSERT_ROWS',
                 resource: { values }
             });
 
@@ -225,7 +229,8 @@ app.post('/qr-code', async (req, res) => {
 // Get participant details
 app.get('/api/participant/:id', async (req, res) => {
     try {
-        const sheets = google.sheets({ version: 'v4', auth: createAuth() });
+        const client = await auth.getClient();
+        const sheets = google.sheets({ version: 'v4', auth: client });
         const response = await sheets.spreadsheets.values.get({
             spreadsheetId: SPREADSHEET_ID,
             range: 'Sheet1!A:L'
