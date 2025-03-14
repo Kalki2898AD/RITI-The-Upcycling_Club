@@ -24,43 +24,49 @@ app.get('/', (req, res) => {
 });
 
 // Logger setup
-const logger = require('./utils/logger');
+const logger = {
+    info: (message, data = '') => {
+        if (process.env.NODE_ENV !== 'production') {
+            console.log(message, data);
+        }
+    },
+    error: (message, error = '') => {
+        if (process.env.NODE_ENV !== 'production') {
+            console.error(message, error);
+        }
+    }
+};
 
-const privateKey = process.env.GOOGLE_SHEETS_PRIVATE_KEY 
+// Google Sheets setup
+const SPREADSHEET_ID = '1wVWWOjFWaSqgR0pHCUvjwdxfscwxN2lK9uA_WW4ZrbU';
+
+// Format private key properly
+const PRIVATE_KEY = process.env.GOOGLE_SHEETS_PRIVATE_KEY
     ? process.env.GOOGLE_SHEETS_PRIVATE_KEY.replace(/\\n/g, '\n')
-    : undefined;
+    : '';
 
 const auth = new google.auth.GoogleAuth({
     credentials: {
+        type: 'service_account',
+        project_id: 'zap-kitchen',
+        private_key: PRIVATE_KEY,
         client_email: process.env.GOOGLE_SHEETS_CLIENT_EMAIL,
-        private_key: privateKey
     },
     scopes: ['https://www.googleapis.com/auth/spreadsheets']
 });
 
-// Initialize Google Sheets
 const sheets = google.sheets({ version: 'v4', auth });
-const spreadsheetId = '1wVWWOjFWaSqgR0pHCUvjwdxfscwxN2lK9uA_WW4ZrbU';
 
-// Test Google Sheets connection on startup
+// Test Google Sheets connection
 (async () => {
     try {
-        logger.info('Testing Google Sheets connection...');
-        logger.info(`Using spreadsheet ID: ${spreadsheetId}`);
-        logger.info(`Using service account: ${process.env.GOOGLE_SHEETS_CLIENT_EMAIL}`);
-        
-        logger.info('Attempting to get spreadsheet info...');
-        const response = await sheets.spreadsheets.get({
-            spreadsheetId,
-            fields: 'properties.title'
+        const testResponse = await sheets.spreadsheets.values.get({
+            spreadsheetId: SPREADSHEET_ID,
+            range: 'A1:A1'
         });
-        
         logger.info('Successfully connected to Google Sheets');
-        logger.info(`Spreadsheet title: ${response.data.properties.title}`);
-        
     } catch (error) {
-        logger.error('Error connecting to Google Sheets:', error);
-        // Don't exit process on error, just log it
+        logger.error('Google Sheets connection error:', error);
     }
 })();
 
@@ -84,9 +90,9 @@ app.post('/qr-code', async (req, res) => {
 
         let upiUrl;
         if (paymentMethod === 'gpay') {
-            upiUrl = `upi://pay?pa=rishikeshvarma9854@okaxis&pn=RITI&am=${amount}&cu=INR`;
+            upiUrl = `upi://pay?pa=${UPI_IDS.gpay}&pn=RITI&am=${amount}&cu=INR`;
         } else if (paymentMethod === 'phonepe') {
-            upiUrl = `upi://pay?pa=6301852709@axl&pn=RITI&am=${amount}&cu=INR`;
+            upiUrl = `upi://pay?pa=${UPI_IDS.phonepe}&pn=RITI&am=${amount}&cu=INR`;
         } else {
             return res.status(400).json({
                 success: false,
@@ -94,7 +100,6 @@ app.post('/qr-code', async (req, res) => {
             });
         }
 
-        // Generate QR code
         const qrCode = await QRCode.toDataURL(upiUrl);
         
         res.json({
@@ -121,7 +126,6 @@ app.post('/api/register', upload.none(), async (req, res) => {
         const missingFields = requiredFields.filter(field => !formData[field]);
         
         if (missingFields.length > 0) {
-            logger.error('Missing required fields:', missingFields);
             return res.status(400).json({
                 success: false,
                 message: `Missing required fields: ${missingFields.join(', ')}`
@@ -149,30 +153,34 @@ app.post('/api/register', upload.none(), async (req, res) => {
         const participantId = `RITI${timestamp}`;
 
         // Prepare data for Google Sheets
-        const values = [
-            [
-                participantId,
-                formData.name,
-                formData.hallTicket,
-                formData.mobile,
-                formData.year,
-                formData.branch,
-                formData.section,
-                formData.selectedPackage,
-                formData.paymentMethod,
-                formData.amount,
-                formData.transactionId || 'N/A',
-                new Date().toISOString()
-            ]
-        ];
+        const values = [[
+            participantId,
+            formData.name,
+            formData.hallTicket,
+            formData.mobile,
+            formData.year,
+            formData.branch,
+            formData.section,
+            formData.selectedPackage,
+            formData.paymentMethod,
+            formData.amount,
+            formData.transactionId || 'N/A',
+            new Date().toISOString()
+        ]];
 
         // Write to Google Sheets
-        await sheets.spreadsheets.values.append({
-            spreadsheetId,
-            range: 'Sheet1!A:L',
-            valueInputOption: 'RAW',
-            resource: { values }
-        });
+        try {
+            await sheets.spreadsheets.values.append({
+                spreadsheetId: SPREADSHEET_ID,
+                range: 'Sheet1!A:L',
+                valueInputOption: 'RAW',
+                resource: { values }
+            });
+            logger.info('Successfully wrote to Google Sheets');
+        } catch (sheetsError) {
+            logger.error('Google Sheets write error:', sheetsError);
+            throw new Error('Failed to save registration data');
+        }
 
         // Generate QR code with participant details
         const qrData = JSON.stringify({
@@ -183,7 +191,6 @@ app.post('/api/register', upload.none(), async (req, res) => {
 
         const qrCode = await QRCode.toDataURL(qrData);
 
-        // Send success response
         res.json({
             success: true,
             message: 'Registration successful!',
@@ -199,7 +206,7 @@ app.post('/api/register', upload.none(), async (req, res) => {
         logger.error('Registration error:', error);
         res.status(500).json({
             success: false,
-            message: 'Registration failed. Please try again.'
+            message: error.message || 'Registration failed. Please try again.'
         });
     }
 });
@@ -208,7 +215,7 @@ app.post('/api/register', upload.none(), async (req, res) => {
 app.get('/api/participant/:id', async (req, res) => {
     try {
         const response = await sheets.spreadsheets.values.get({
-            spreadsheetId,
+            spreadsheetId: SPREADSHEET_ID,
             range: 'Sheet1!A:L'
         });
 
@@ -240,7 +247,13 @@ app.get('/api/participant/:id', async (req, res) => {
             });
         }
     } catch (error) {
-        const errorResponse = handleError(error, 'fetching participant details');
+        const errorResponse = {
+            success: false,
+            message: 'Failed to fetch participant details',
+            details: error.message,
+            stack: process.env.NODE_ENV !== 'production' ? error.stack : undefined
+        };
+        logger.error('Error fetching participant details:', error);
         res.status(500).json(errorResponse);
     }
 });
