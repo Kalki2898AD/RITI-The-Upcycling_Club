@@ -227,53 +227,61 @@ app.post('/qr-code', async (req, res) => {
     }
 });
 
-// Get participant details
+// Participant verification endpoint
 app.get('/api/participant/:id', async (req, res) => {
     try {
         const auth = await getAuthClient();
         const client = await auth.getClient();
+        logger.info('Successfully created auth client for verification');
+
         const sheets = google.sheets({ version: 'v4', auth: client });
         const response = await sheets.spreadsheets.values.get({
             spreadsheetId: SPREADSHEET_ID,
-            range: 'Sheet1!A:L'
+            range: 'Sheet1'
         });
 
-        const rows = response.data.values || [];
-        const participant = rows.find(row => row[0] === req.params.id);
-
-        if (participant) {
-            res.json({
-                success: true,
-                participant: {
-                    id: participant[0],
-                    name: participant[1],
-                    hallTicket: participant[2],
-                    year: participant[3],
-                    branch: participant[4],
-                    section: participant[5],
-                    amount: participant[6],
-                    games: participant[7],
-                    paymentMethod: participant[8],
-                    transactionId: participant[9],
-                    registrationDate: participant[10],
-                    paymentStatus: participant[11]
-                }
-            });
-        } else {
-            res.status(404).json({ 
-                success: false, 
-                message: 'Participant not found' 
+        const rows = response.data.values;
+        if (!rows || rows.length === 0) {
+            return res.status(404).json({
+                success: false,
+                message: 'No participants found'
             });
         }
+
+        // Find participant by ID
+        const participantId = req.params.id;
+        const participant = rows.find(row => row[0] === participantId);
+
+        if (!participant) {
+            return res.status(404).json({
+                success: false,
+                message: 'Participant not found'
+            });
+        }
+
+        // Return participant details
+        res.json({
+            success: true,
+            participant: {
+                id: participant[0],
+                name: participant[1],
+                hallTicket: participant[2],
+                mobile: participant[3],
+                year: participant[4],
+                branch: participant[5],
+                section: participant[6],
+                selectedPackage: participant[7],
+                paymentMethod: participant[8],
+                amount: participant[9]
+            }
+        });
+
     } catch (error) {
-        const errorResponse = {
+        logger.error('Error verifying participant:', error);
+        res.status(500).json({
             success: false,
-            message: 'Failed to fetch participant details',
-            details: error.message,
-            stack: process.env.NODE_ENV !== 'production' ? error.stack : undefined
-        };
-        logger.error('Error fetching participant details:', error);
-        res.status(500).json(errorResponse);
+            message: 'Failed to verify participant'
+        });
     }
 });
 
