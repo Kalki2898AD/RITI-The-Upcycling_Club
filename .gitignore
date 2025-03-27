@@ -18,6 +18,7 @@ package-lock.json
 # Credentials
 credentials.json
 service-account.json
+zap-kitchen-dd2ce00e67aa.json
 
 # IDE
 .vscode/
