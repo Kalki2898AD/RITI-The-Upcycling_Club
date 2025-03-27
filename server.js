@@ -31,10 +31,21 @@ const SPREADSHEET_ID = '1wVWWOjFWaSqgR0pHCUvjwdxfscwxN2lK9uA_WW4ZrbU';
 // Create auth client - using keyFile directly which was working before
 const getAuthClient = () => {
     try {
-        return new google.auth.GoogleAuth({
-            keyFile: 'credentials.json',
-            scopes: ['https://www.googleapis.com/auth/spreadsheets']
-        });
+        // Check if credentials file exists
+        const fs = require('fs');
+        const credentialsPath = path.join(__dirname, 'credentials.json');
+        
+        if (fs.existsSync(credentialsPath)) {
+            logger.info('Using credentials file for authentication');
+            return new google.auth.GoogleAuth({
+                keyFile: credentialsPath,
+                scopes: ['https://www.googleapis.com/auth/spreadsheets']
+            });
+        } else {
+            // Fallback to environment variables if file doesn't exist
+            logger.error('Credentials file not found, using fallback');
+            throw new Error('Credentials file not found');
+        }
     } catch (error) {
         logger.error('Auth client creation error:', error);
         throw error;
