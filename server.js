@@ -118,6 +118,7 @@ app.post('/api/register', upload.none(), async (req, res) => {
         const values = [[
             participantId,
             formData.name,
+            '', // Empty placeholder for hallTicket to maintain compatibility
             formData.mobile,
             formData.year,
             formData.branch,
@@ -264,13 +265,13 @@ app.get('/api/participant/:id', async (req, res) => {
             participant: {
                 id: participant[0],
                 name: participant[1],
-                mobile: participant[2],
-                year: participant[3],
-                branch: participant[4],
-                section: participant[5],
-                selectedPackage: participant[6],
-                paymentMethod: participant[7],
-                amount: participant[8]
+                mobile: participant[3],
+                year: participant[4],
+                branch: participant[5],
+                section: participant[6],
+                selectedPackage: participant[7],
+                paymentMethod: participant[8],
+                amount: participant[9]
             }
         });
 
