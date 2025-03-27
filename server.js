@@ -76,13 +76,11 @@ const getAuthClient = () => {
 async function saveToGoogleSheets(data) {
     try {
         logger.info('Attempting to save data to Google Sheets');
-        const auth = await getAuthClient();
+        const auth = getAuthClient();
         logger.debug('Auth client created successfully');
         
-        const client = await auth.getClient();
-        logger.debug('Got auth client');
-        
-        const sheets = google.sheets({ version: 'v4', auth: client });
+        // With JWT, we don't need to call getClient()
+        const sheets = google.sheets({ version: 'v4', auth });
         logger.debug('Created sheets client');
         
         const values = [
