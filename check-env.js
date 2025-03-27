@@ -1,54 +1,41 @@
-// This script checks if all required environment variables are set
+// Script to check and configure environment variables for Google Sheets
 const fs = require('fs');
 const path = require('path');
 
 // Set OpenSSL configuration to resolve decoder issues
-process.env.NODE_OPTIONS = '--openssl-legacy-provider';
 process.env.OPENSSL_CONF = '/dev/null';
 
-// Check if .env file exists
-if (!fs.existsSync(path.join(__dirname, '.env'))) {
-  console.error('Error: .env file not found');
-  process.exit(1);
+try {
+    // Check if credentials file exists
+    const credentialsPath = path.join(__dirname, 'zap-kitchen-dd2ce00e67aa.json');
+    if (fs.existsSync(credentialsPath)) {
+        console.log('✅ Credentials file found');
+        
+        // Read the credentials file
+        const credentials = require(credentialsPath);
+        
+        // Set environment variables from credentials file
+        if (credentials && credentials.private_key) {
+            process.env.GOOGLE_SHEETS_PRIVATE_KEY = credentials.private_key;
+            console.log('✅ Private key loaded from credentials file');
+        } else {
+            console.error('❌ Private key not found in credentials file');
+        }
+    } else {
+        console.log('❌ Credentials file not found at:', credentialsPath);
+        console.log('Checking environment variables instead...');
+        
+        // Check if private key is set in environment variables
+        if (process.env.GOOGLE_SHEETS_PRIVATE_KEY) {
+            console.log('✅ Private key found in environment variables');
+        } else {
+            console.error('❌ Private key not found in environment variables');
+        }
+    }
+} catch (error) {
+    console.error('Error checking credentials:', error);
 }
 
-// Check for required environment variables
-require('dotenv').config();
-
-const requiredVars = [
-  'GOOGLE_SHEETS_PRIVATE_KEY'
-];
-
-const missingVars = requiredVars.filter(varName => !process.env[varName]);
-
-if (missingVars.length > 0) {
-  console.error(`Error: Missing required environment variables: ${missingVars.join(', ')}`);
-  process.exit(1);
-}
-
-console.log('Environment variables check passed!');
-
-// Function to check if a string is a valid private key
-function isValidPrivateKey(key) {
-    if (!key) return false;
-    const formattedKey = key.replace(/\\n/g, '\n');
-    return (
-        formattedKey.includes('-----BEGIN PRIVATE KEY-----') &&
-        formattedKey.includes('-----END PRIVATE KEY-----')
-    );
-}
-
-// Check environment variables
-console.log('Checking environment variables...');
-
-const privateKey = process.env.GOOGLE_SHEETS_PRIVATE_KEY;
-console.log('GOOGLE_SHEETS_PRIVATE_KEY:', {
-    exists: !!privateKey,
-    length: privateKey?.length,
-    isValid: isValidPrivateKey(privateKey),
-    firstChars: privateKey?.substring(0, 30) + '...',
-    lastChars: '...' + privateKey?.substring(privateKey.length - 30)
-});
-
-console.log('OPENSSL_LEGACY_PROVIDER:', process.env.OPENSSL_LEGACY_PROVIDER);
-console.log('NODE_OPTIONS:', process.env.NODE_OPTIONS);
+module.exports = { 
+    isConfigured: !!process.env.GOOGLE_SHEETS_PRIVATE_KEY 
+};

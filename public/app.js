@@ -267,9 +267,9 @@ document.addEventListener('DOMContentLoaded', function() {
             
             if (result.success) {
                 // Display participant details
-                document.getElementById('participant-name').textContent = `Name: ${result.participantData.name}`;
-                document.getElementById('participant-id').textContent = `ID: ${result.participantData.id}`;
-                document.getElementById('participant-package').textContent = `Package: ${result.participantData.package}`;
+                document.getElementById('participant-name').textContent = `Name: ${result.name || name}`;
+                document.getElementById('participant-id').textContent = `ID: ${result.participantId}`;
+                document.getElementById('participant-package').textContent = `Package: ${selectedGames === '1' ? gameSelection : '2 Games Package'}`;
 
                 // Display QR code
                 const qrContainer = document.getElementById('participant-qr');
@@ -279,7 +279,7 @@ document.addEventListener('DOMContentLoaded', function() {
                 const downloadButton = document.getElementById('download-qr');
                 downloadButton.onclick = () => {
                     const link = document.createElement('a');
-                    link.download = `RITI-${result.participantData.id}.png`;
+                    link.download = `RITI-${result.participantId}.png`;
                     link.href = result.qrCode;
                     document.body.appendChild(link);
                     link.click();

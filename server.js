@@ -1,14 +1,17 @@
 const express = require('express');
 const cors = require('cors');
-const { google } = require('googleapis');
 const multer = require('multer');
 const QRCode = require('qrcode');
 const path = require('path');
-require('dotenv').config();
+const fs = require('fs');
 
-// Set OpenSSL configuration before anything else
-process.env.OPENSSL_CONF = '/dev/null';
+// Simple logger
+const logger = {
+    info: (...args) => console.log('[INFO]', ...args),
+    error: (...args) => console.error('[ERROR]', ...args)
+};
 
+// Set up Express
 const app = express();
 const upload = multer();
 const PORT = process.env.PORT || 3000;
@@ -19,65 +22,10 @@ app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 app.use(express.static(path.join(__dirname, 'public')));
 
-// Logger setup
-const logger = {
-    info: (...args) => console.log('[INFO]', ...args),
-    error: (...args) => console.error('[ERROR]', ...args)
-};
+// In-memory storage for registrations (temporary solution)
+const registrations = [];
 
-// Google Sheets Configuration
-const SPREADSHEET_ID = '1wVWWOjFWaSqgR0pHCUvjwdxfscwxN2lK9uA_WW4ZrbU';
-
-// Create auth client
-const getAuthClient = () => {
-    try {
-        const privateKey = process.env.GOOGLE_SHEETS_PRIVATE_KEY?.replace(/\\n/g, '\n');
-        if (!privateKey) {
-            throw new Error('Private key is missing');
-        }
-
-        return new google.auth.GoogleAuth({
-            credentials: {
-                client_email: 'ritiactivityserviceaccount@zap-kitchen.iam.gserviceaccount.com',
-                private_key: privateKey
-            },
-            scopes: ['https://www.googleapis.com/auth/spreadsheets']
-        });
-    } catch (error) {
-        logger.error('Auth client creation error:', error);
-        throw error;
-    }
-};
-
-// Test connection on startup
-(async () => {
-    try {
-        const auth = await getAuthClient();
-        const client = await auth.getClient();
-        logger.info('Successfully created auth client');
-
-        const sheets = google.sheets({ version: 'v4', auth: client });
-        const response = await sheets.spreadsheets.values.get({
-            spreadsheetId: SPREADSHEET_ID,
-            range: 'Sheet1!A1:A1'
-        });
-        logger.info('Successfully accessed Google Sheet:', response.data);
-    } catch (error) {
-        logger.error('Google Sheets connection error:', {
-            message: error.message,
-            code: error.code,
-            response: error.response?.data
-        });
-    }
-})();
-
-// UPI IDs configuration
-const UPI_IDS = {
-    gpay: 'rishikeshvarma9854@okaxis',
-    phonepe: '6301852709@axl'
-};
-
-// Registration endpoint
+// API Endpoints
 app.post('/api/register', upload.none(), async (req, res) => {
     try {
         const formData = req.body;
@@ -114,81 +62,55 @@ app.post('/api/register', upload.none(), async (req, res) => {
         const timestamp = new Date().getTime();
         const participantId = `RITI${timestamp}`;
 
-        // Prepare data for Google Sheets
-        const values = [[
+        // Create registration record
+        const registration = {
             participantId,
-            formData.name,
-            '', // Empty placeholder for hallTicket to maintain compatibility
-            formData.mobile,
-            formData.year,
-            formData.branch,
-            formData.section,
-            formData.selectedPackage,
-            formData.paymentMethod,
-            formData.amount,
-            formData.transactionId || 'N/A',
-            new Date().toISOString()
-        ]];
+            name: formData.name,
+            mobile: formData.mobile,
+            year: formData.year,
+            branch: formData.branch,
+            section: formData.section,
+            selectedPackage: formData.selectedPackage,
+            gameSelection: formData.gameSelection || 'Both Games',
+            paymentMethod: formData.paymentMethod,
+            amount: formData.amount,
+            transactionId: formData.transactionId || 'N/A',
+            timestamp: new Date().toISOString()
+        };
 
-        // Write to Google Sheets
-        try {
-            const auth = await getAuthClient();
-            const client = await auth.getClient();
-            logger.info('Successfully created auth client for write operation');
+        // Store registration in memory
+        registrations.push(registration);
+        logger.info(`Registration saved with ID: ${participantId}`);
 
-            const sheets = google.sheets({ version: 'v4', auth: client });
-            const result = await sheets.spreadsheets.values.append({
-                spreadsheetId: SPREADSHEET_ID,
-                range: 'Sheet1',
-                valueInputOption: 'USER_ENTERED',
-                insertDataOption: 'INSERT_ROWS',
-                resource: { values }
-            });
+        // Generate QR code
+        const qrData = JSON.stringify({
+            participantId,
+            name: formData.name,
+            mobile: formData.mobile,
+            package: formData.selectedPackage,
+            gameSelection: formData.gameSelection || 'Both Games',
+            amount: formData.amount,
+            paymentMethod: formData.paymentMethod,
+            timestamp: new Date().toISOString()
+        });
 
-            logger.info('Successfully wrote to Google Sheets:', {
-                updatedRange: result.data.updates?.updatedRange,
-                updatedRows: result.data.updates?.updatedRows
-            });
+        const qrCodeDataURL = await QRCode.toDataURL(qrData);
 
-            // Generate QR code
-            const qrData = JSON.stringify({
-                id: participantId,
-                name: formData.name,
-                package: formData.selectedPackage
-            });
-
-            const qrCode = await QRCode.toDataURL(qrData);
-
-            res.json({
-                success: true,
-                message: 'Registration successful!',
-                participantData: {
-                    id: participantId,
-                    name: formData.name,
-                    package: formData.selectedPackage
-                },
-                qrCode
-            });
-
-        } catch (sheetsError) {
-            logger.error('Google Sheets write error:', {
-                message: sheetsError.message,
-                code: sheetsError.code,
-                response: sheetsError.response?.data
-            });
-            throw new Error(`Failed to save registration data: ${sheetsError.message}`);
-        }
-
+        return res.status(200).json({
+            success: true,
+            message: 'Registration successful',
+            participantId,
+            qrCode: qrCodeDataURL
+        });
     } catch (error) {
         logger.error('Registration error:', error);
-        res.status(500).json({
+        return res.status(500).json({
             success: false,
-            message: error.message || 'Registration failed. Please try again.'
+            message: `Registration failed: ${error.message}`
         });
     }
 });
 
-// QR code generation endpoint
 app.post('/qr-code', async (req, res) => {
     try {
         const { amount, paymentMethod } = req.body;
@@ -196,92 +118,38 @@ app.post('/qr-code', async (req, res) => {
         if (!amount || !paymentMethod) {
             return res.status(400).json({
                 success: false,
-                message: 'Amount and payment method are required'
+                message: 'Missing required fields'
             });
         }
 
-        let upiUrl;
-        if (paymentMethod === 'gpay') {
-            upiUrl = `upi://pay?pa=${UPI_IDS.gpay}&pn=RITI&am=${amount}&cu=INR`;
-        } else if (paymentMethod === 'phonepe') {
-            upiUrl = `upi://pay?pa=${UPI_IDS.phonepe}&pn=RITI&am=${amount}&cu=INR`;
-        } else {
-            return res.status(400).json({
-                success: false,
-                message: 'Invalid payment method'
-            });
-        }
+        const qrData = JSON.stringify({
+            amount,
+            paymentMethod,
+            timestamp: new Date().toISOString()
+        });
 
-        const qrCode = await QRCode.toDataURL(upiUrl);
-        
-        res.json({
+        const qrCodeDataURL = await QRCode.toDataURL(qrData);
+
+        return res.status(200).json({
             success: true,
-            qrCode
+            qrCode: qrCodeDataURL
         });
     } catch (error) {
-        logger.error('Error generating QR code:', error);
-        res.status(500).json({
+        logger.error('QR code generation error:', error);
+        return res.status(500).json({
             success: false,
-            message: 'Failed to generate QR code'
+            message: `Failed to generate QR code: ${error.message}`
         });
     }
 });
 
-// Participant verification endpoint
-app.get('/api/participant/:id', async (req, res) => {
-    try {
-        const auth = await getAuthClient();
-        const client = await auth.getClient();
-        logger.info('Successfully created auth client for verification');
-
-        const sheets = google.sheets({ version: 'v4', auth: client });
-        const response = await sheets.spreadsheets.values.get({
-            spreadsheetId: SPREADSHEET_ID,
-            range: 'Sheet1'
-        });
-
-        const rows = response.data.values;
-        if (!rows || rows.length === 0) {
-            return res.status(404).json({
-                success: false,
-                message: 'No participants found'
-            });
-        }
-
-        // Find participant by ID
-        const participantId = req.params.id;
-        const participant = rows.find(row => row[0] === participantId);
-
-        if (!participant) {
-            return res.status(404).json({
-                success: false,
-                message: 'Participant not found'
-            });
-        }
-
-        // Return participant details
-        res.json({
-            success: true,
-            participant: {
-                id: participant[0],
-                name: participant[1],
-                mobile: participant[3],
-                year: participant[4],
-                branch: participant[5],
-                section: participant[6],
-                selectedPackage: participant[7],
-                paymentMethod: participant[8],
-                amount: participant[9]
-            }
-        });
-
-    } catch (error) {
-        logger.error('Error verifying participant:', error);
-        res.status(500).json({
-            success: false,
-            message: 'Failed to verify participant'
-        });
-    }
+// Get all registrations (for debugging)
+app.get('/api/registrations', (req, res) => {
+    res.json({
+        success: true,
+        count: registrations.length,
+        registrations
+    });
 });
 
 // Serve index.html for the root route
