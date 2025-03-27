@@ -89,7 +89,7 @@ document.addEventListener('DOMContentLoaded', function() {
             selectedGames = this.dataset.games;
             selectedAmount = this.dataset.amount;
             
-            document.getElementById('selected-package').value = selectedGames + ' Games';
+            document.getElementById('selected-package').value = selectedGames === '2' ? '2 Games Package' : 'Single Game';
             document.getElementById('amount-display').value = selectedAmount;
             
             document.getElementById('game-options').classList.add('hidden');

@@ -1,4 +1,32 @@
+// This script checks if all required environment variables are set
+const fs = require('fs');
+const path = require('path');
+
+// Set OpenSSL configuration to resolve decoder issues
+process.env.NODE_OPTIONS = '--openssl-legacy-provider';
+process.env.OPENSSL_CONF = '/dev/null';
+
+// Check if .env file exists
+if (!fs.existsSync(path.join(__dirname, '.env'))) {
+  console.error('Error: .env file not found');
+  process.exit(1);
+}
+
+// Check for required environment variables
 require('dotenv').config();
+
+const requiredVars = [
+  'GOOGLE_SHEETS_PRIVATE_KEY'
+];
+
+const missingVars = requiredVars.filter(varName => !process.env[varName]);
+
+if (missingVars.length > 0) {
+  console.error(`Error: Missing required environment variables: ${missingVars.join(', ')}`);
+  process.exit(1);
+}
+
+console.log('Environment variables check passed!');
 
 // Function to check if a string is a valid private key
 function isValidPrivateKey(key) {
