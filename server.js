@@ -1,4 +1,5 @@
 const express = require('express');
+ 
 const cors = require('cors');
 const { google } = require('googleapis');
 const multer = require('multer');
@@ -22,11 +23,27 @@ app.use(express.static(path.join(__dirname, 'public')));
 // Logger setup
 const logger = {
     info: (...args) => console.log('[INFO]', ...args),
-    error: (...args) => console.error('[ERROR]', ...args)
+    error: (...args) => console.error('[ERROR]', ...args),
+    debug: (...args) => console.log('[DEBUG]', JSON.stringify(args))
 };
 
 // Google Sheets Configuration
 const SPREADSHEET_ID = '1wVWWOjFWaSqgR0pHCUvjwdxfscwxN2lK9uA_WW4ZrbU';
+
+// Service account credentials
+const CREDENTIALS = {
+  "type": "service_account",
+  "project_id": "zap-kitchen",
+  "private_key_id": "dd2ce00e67aab74097bfff2757687be3d5abdb55",
+  "private_key": "-----BEGIN PRIVATE KEY-----\nMIIEvQIBADANBgkqhkiG9w0BAQEFAASCBKcwggSjAgEAAoIBAQCjdq+wKeM7YSXI\ngL5BMWHeatS6Kg2VHQbOq8Vv/LCGya49yM9SESrwSoq9R/d8W88sxnUuMrkIFuEy\nEuwdk9fUKEXadhmSr0MSujT8MvbOCY2tUy+beaT/NB7ZCXyMLVbrpFXLro0C2/tW\ngY/5K8IN0g0xhWH8hO+barv3ZZK9/SjBXIVON+7okT1Lgf1rY1kX2Xq/XAR6B3SX\nD8GUiboplf8lCwS1XV+n8h2jACOfKidy4i4bu7KVlRWkNcSF/eSL47aRTpqrelXi\nZS85IOHsEA8zVpb21w3outlcd+Q+idYBbFQhq3qxKdH1EBHflwlbB7s18llEWLwJ\nst2j2lwvAgMBAAECggEACQxp7kT9m3qls/6PSYvZd2kPfspcJR4pJc5PFcyH3C0U\nj+LYJ6y/wKojGc0Q+JBkLtlmXCs+e49dz78Ai7biTdj4kzWbGlx/tjYsrWT1rTw6\nk0SMNOIcBGzErTv2sxN4ShG3OvRd+AzoUeIPuNU3nvGED+ChgkuYHeMWk5c4l8Rf\nZ3mqR4hgyv8h8bAz7KG88EIY2aE65msj8f7XYRgg6Rg+rUkc90JML5EIBeBj3eVn\noLSmGgplX5AHv7p/BhTcrEMTySm5tW2R1oR/sMEJjyXc1kdAd6KwfSIKCbu2Hl5l\naHjBSdQhhbN4YyAlMfFaiGK/HTfyh4ePmg8SHQtaDQKBgQDc50cQK0kZ70F4u3LI\n2rZu7GJQ6k3eR2Vp8tWkqKlVoW++l3K2/EzgjS6YBsmhm4CSuczGllGN5ULXb/yX\nGhaJK+GB60u03nOKyxPlbJJ9s6PSrLoPxgPw8ANg38wHR5JmvPNhaUTnR9DfO39w\n0Rd03cN3vg/SGY58kAwA2ollIwKBgQC9by5KAFghH7mkUQDAXSpkXa+mNbSbvGQW\nuqG9E5b7q2BW5TPwuvnxv9Vow94JH7QZRO1EAf/3jzPAXFaUr1uz/NhXXD0DXhOP\n7M7GqzFEW02jCKi+c8Qb6RRGDZZQx15Q7Z0hX7wNauusvxT78KUy37zQ93MXUijk\nvQpqHit7hQKBgGdTDlwzwueMj3UnSFNGadqMWpg6X92+S2M5IFD6SuowrpHZSODq\nNhM6NjcJxbn/gC4hFfU1TkQungsi6GTM4QmcKsiYBDs/aY/b2RyQohyFr/TUsdq6\n5hEGUq43P7mP8px3eOdxU7dSUhJ4Q+3C/1O8frc9gSzmo00EG3kyvt09AoGBALTM\n5qsuhO6obvCLd2IiCZHdcQX8ADMbrZOb8T6a8eGmAb8t51L9wgygATmKp+KhZa0w\nghwEpJ9NCCGyf9hNPgMdcgZ/PKR4J8eYRwqK3ezWD9VpMFUF/Mh+vyDVWwAiKLyo\n7O2rh7pusB0iCw8i8SkLLhVr92bsvacDXmtF/E5ZAoGABr3g6GG9DO4dteKbyO4d\nD3ZYwx0F49o4hmQBaWtrZOcKpc4ZdVDG7GBYiBXnrRFodaHxnyx6E94EeUC7Ym+L\nNIcykwO9tsBlCkS6GgRPw2vDOL/eH1YLfSghkWNWzXjFZ9LLodPUsYXG/O4tkXXO\ne6jvPN9kspTNZJ67MzVOiVM=\n-----END PRIVATE KEY-----\n",
+  "client_email": "ritiactivityserviceaccount@zap-kitchen.iam.gserviceaccount.com",
+  "client_id": "114466122007394410752",
+  "auth_uri": "https://accounts.google.com/o/oauth2/auth",
+  "token_uri": "https://oauth2.googleapis.com/token",
+  "auth_provider_x509_cert_url": "https://www.googleapis.com/oauth2/v1/certs",
+  "client_x509_cert_url": "https://www.googleapis.com/robot/v1/metadata/x509/ritiactivityserviceaccount%40zap-kitchen.iam.gserviceaccount.com",
+  "universe_domain": "googleapis.com"
+};
 
 // UPI IDs configuration
 const UPI_IDS = {
@@ -37,34 +54,85 @@ const UPI_IDS = {
 // Create auth client
 const getAuthClient = () => {
     try {
-        // Check if credentials file exists
-        const fs = require('fs');
-        const credentialsPath = path.join(__dirname, 'zap-kitchen-dd2ce00e67aa.json');
-        
-        if (fs.existsSync(credentialsPath)) {
-            logger.info('Using zap-kitchen credentials file for authentication');
-            return new google.auth.GoogleAuth({
-                keyFile: credentialsPath,
-                scopes: ['https://www.googleapis.com/auth/spreadsheets']
-            });
-        } else if (process.env.GOOGLE_CREDENTIALS) {
-            // Use environment variable if available (for Vercel)
-            logger.info('Using environment variable for authentication');
-            const credentials = JSON.parse(process.env.GOOGLE_CREDENTIALS);
-            return new google.auth.GoogleAuth({
-                credentials,
-                scopes: ['https://www.googleapis.com/auth/spreadsheets']
-            });
-        } else {
-            // No authentication method available
-            logger.error('No authentication method available');
-            throw new Error('No authentication method available');
-        }
+        logger.info('Using direct JWT authentication');
+        // Create a JWT client directly
+        return new google.auth.JWT(
+            CREDENTIALS.client_email,
+            null,
+            CREDENTIALS.private_key,
+            ['https://www.googleapis.com/auth/spreadsheets']
+        );
     } catch (error) {
         logger.error('Auth client creation error:', error);
+        logger.debug('Auth error details:', {
+            message: error.message,
+            stack: error.stack
+        });
         throw error;
     }
 };
+
+// Function to save data to Google Sheets
+async function saveToGoogleSheets(data) {
+    try {
+        logger.info('Attempting to save data to Google Sheets');
+        const auth = await getAuthClient();
+        logger.debug('Auth client created successfully');
+        
+        const client = await auth.getClient();
+        logger.debug('Got auth client');
+        
+        const sheets = google.sheets({ version: 'v4', auth: client });
+        logger.debug('Created sheets client');
+        
+        const values = [
+            [
+                data.id,
+                data.name,
+                data.phone,
+                data.year,
+                data.branch,
+                data.section,
+                data.selectedPackage,
+                data.hallTicket || 'N/A',
+                data.amount,
+                data.paymentMethod,
+                data.timestamp,
+                data.gameSelection
+            ]
+        ];
+        
+        logger.debug('Prepared values for sheets:', values);
+        
+        const response = await sheets.spreadsheets.values.append({
+            spreadsheetId: SPREADSHEET_ID,
+            range: 'Sheet1',
+            valueInputOption: 'USER_ENTERED',
+            insertDataOption: 'INSERT_ROWS',
+            resource: { values }
+        });
+        
+        logger.debug('Google Sheets response:', {
+            updatedRange: response.data.updates?.updatedRange,
+            updatedRows: response.data.updates?.updatedRows
+        });
+        
+        logger.info('Data saved to Google Sheets successfully');
+        return true;
+    } catch (error) {
+        logger.error('Failed to save to Google Sheets:', error);
+        logger.debug('Google Sheets error details:', {
+            message: error.message,
+            stack: error.stack,
+            response: error.response ? {
+                status: error.response.status,
+                statusText: error.response.statusText,
+                data: error.response.data
+            } : 'No response'
+        });
+        return false;
+    }
+}
 
 // Test connection on startup
 (async () => {
@@ -84,100 +152,47 @@ app.post('/api/register', upload.none(), async (req, res) => {
     try {
         const formData = req.body;
         logger.info('Received registration data:', formData);
+        logger.debug('Registration form data:', formData);
 
-        // Basic validation
-        const requiredFields = ['name', 'mobile', 'year', 'branch', 'section', 'selectedPackage', 'paymentMethod', 'amount'];
-        const missingFields = requiredFields.filter(field => !formData[field]);
-        
-        if (missingFields.length > 0) {
-            return res.status(400).json({
-                success: false,
-                message: `Missing required fields: ${missingFields.join(', ')}`
-            });
-        }
+        // Generate a unique ID for the participant
+        const participantId = `RITI${Date.now().toString().slice(-6)}`;
+        logger.debug('Generated participant ID:', participantId);
 
-        // Validate mobile number
-        if (!/^\d{10}$/.test(formData.mobile)) {
-            return res.status(400).json({
-                success: false,
-                message: 'Invalid mobile number'
-            });
-        }
-
-        // Validate transaction ID for online payments
-        if (formData.paymentMethod !== 'CASH' && (!formData.transactionId || !/^\d{12}$/.test(formData.transactionId))) {
-            return res.status(400).json({
-                success: false,
-                message: 'Please enter a valid 12-digit UTR number'
-            });
-        }
-
-        // Generate unique participant ID
-        const timestamp = new Date().getTime();
-        const participantId = `RITI${timestamp}`;
-
-        // Create registration record
-        const registration = {
-            participantId,
+        // Create registration data object
+        const registrationData = {
+            id: participantId,
             name: formData.name,
-            mobile: formData.mobile,
+            phone: formData.mobile,
             year: formData.year,
             branch: formData.branch,
             section: formData.section,
             selectedPackage: formData.selectedPackage,
-            gameSelection: formData.gameSelection || 'Both Games',
-            paymentMethod: formData.paymentMethod,
+            hallTicket: formData.transactionId || 'N/A',
             amount: formData.amount,
-            transactionId: formData.transactionId || 'N/A',
-            timestamp: new Date().toISOString()
+            paymentMethod: formData.paymentMethod,
+            timestamp: new Date().toISOString(),
+            gameSelection: formData.gameSelection || 'Both Games'
         };
+        
+        logger.debug('Prepared registration data:', registrationData);
 
-        // Prepare data for Google Sheets
-        const values = [[
-            participantId,
-            formData.name,
-            formData.mobile,
-            formData.year,
-            formData.branch,
-            formData.section,
-            formData.selectedPackage,
-            formData.paymentMethod,
-            formData.amount,
-            formData.transactionId || 'N/A',
-            new Date().toISOString(),
-            formData.gameSelection || 'Both Games' // Add game selection or default to Both Games
-        ]];
-
-        // Try to write to Google Sheets
-        try {
-            const auth = await getAuthClient();
-            const client = await auth.getClient();
-            logger.info('Successfully created auth client for write operation');
-
-            const sheets = google.sheets({ version: 'v4', auth: client });
-            const result = await sheets.spreadsheets.values.append({
-                spreadsheetId: SPREADSHEET_ID,
-                range: 'Sheet1',
-                valueInputOption: 'USER_ENTERED',
-                insertDataOption: 'INSERT_ROWS',
-                resource: { values }
-            });
-
-            logger.info('Successfully wrote to Google Sheets:', {
-                updatedRange: result.data.updates?.updatedRange,
-                updatedRows: result.data.updates?.updatedRows
-            });
-        } catch (error) {
+        // Try to save to Google Sheets
+        const savedToSheets = await saveToGoogleSheets(registrationData);
+        
+        if (!savedToSheets) {
             // If Google Sheets fails, store in memory as fallback
-            logger.error('Failed to save to Google Sheets, using memory fallback:', error);
-            registrations.push(registration);
+            logger.info('Using memory fallback for registration');
+            if (!global.registrations) {
+                global.registrations = [];
+            }
+            global.registrations.push(registrationData);
         }
 
-        // Generate QR code
+        // Generate QR code data
         const qrData = JSON.stringify({
-            participantId,
+            id: participantId,
             name: formData.name,
-            mobile: formData.mobile,
+            phone: formData.mobile,
             package: formData.selectedPackage,
             gameSelection: formData.gameSelection || 'Both Games',
             amount: formData.amount,
@@ -200,6 +215,10 @@ app.post('/api/register', upload.none(), async (req, res) => {
         });
     } catch (error) {
         logger.error('Registration error:', error);
+        logger.debug('Registration error details:', {
+            message: error.message,
+            stack: error.stack
+        });
         return res.status(500).json({
             success: false,
             message: `Registration failed: ${error.message}`

@@ -5,7 +5,7 @@
             "src": "server.js",
             "use": "@vercel/node",
             "config": {
-                "includeFiles": ["public/**", "zap-kitchen-dd2ce00e67aa.json"]
+                "includeFiles": ["public/**", "new-credentials.json"]
             }
         }
     ],
