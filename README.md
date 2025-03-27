@@ -44,3 +44,28 @@ npm start
 - Backend: Node.js, Express
 - Database: Google Sheets API
 - Libraries: html5-qrcode, multer, google-spreadsheet
+
+## Vercel Deployment with Google Sheets Integration
+
+To deploy this application to Vercel with Google Sheets integration, follow these steps:
+
+1. Push your code to GitHub
+
+2. Set up the GOOGLE_CREDENTIALS environment variable in Vercel:
+   - Go to your Vercel project settings
+   - Navigate to the "Environment Variables" section
+   - Add a new environment variable named `GOOGLE_CREDENTIALS`
+   - Copy the entire contents of your `credentials.json` file and paste it as the value
+   - Make sure to copy the ENTIRE JSON content, including all curly braces and quotes
+
+3. Deploy your application
+
+4. Verify that the Google Sheets integration is working by submitting a test registration
+
+## Troubleshooting
+
+If you encounter "Invalid JWT Signature" errors:
+
+1. Make sure your service account has the correct permissions for the Google Sheet
+2. Verify that the GOOGLE_CREDENTIALS environment variable contains the complete and valid JSON
+3. Check that the OPENSSL_CONF environment variable is set to "/dev/null" in Vercel

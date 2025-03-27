@@ -28,7 +28,7 @@ const logger = {
 // Google Sheets Configuration
 const SPREADSHEET_ID = '1wVWWOjFWaSqgR0pHCUvjwdxfscwxN2lK9uA_WW4ZrbU';
 
-// Create auth client - using keyFile directly which was working before
+// Create auth client
 const getAuthClient = () => {
     try {
         // Check if credentials file exists
@@ -41,10 +41,18 @@ const getAuthClient = () => {
                 keyFile: credentialsPath,
                 scopes: ['https://www.googleapis.com/auth/spreadsheets']
             });
+        } else if (process.env.GOOGLE_CREDENTIALS) {
+            // Use environment variable if available (for Vercel)
+            logger.info('Using environment variable for authentication');
+            const credentials = JSON.parse(process.env.GOOGLE_CREDENTIALS);
+            return new google.auth.GoogleAuth({
+                credentials,
+                scopes: ['https://www.googleapis.com/auth/spreadsheets']
+            });
         } else {
-            // Fallback to environment variables if file doesn't exist
-            logger.error('Credentials file not found, using fallback');
-            throw new Error('Credentials file not found');
+            // No authentication method available
+            logger.error('No authentication method available');
+            throw new Error('No authentication method available');
         }
     } catch (error) {
         logger.error('Auth client creation error:', error);
