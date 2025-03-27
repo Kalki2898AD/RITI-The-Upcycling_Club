@@ -28,6 +28,12 @@ const logger = {
 // Google Sheets Configuration
 const SPREADSHEET_ID = '1wVWWOjFWaSqgR0pHCUvjwdxfscwxN2lK9uA_WW4ZrbU';
 
+// UPI IDs configuration
+const UPI_IDS = {
+    gpay: 'sirig1703@okhdfcbank',  // Update this with your new GPay UPI ID
+    phonepe: 'sirig1703@okhdfcbank'           // Update this with your new PhonePe UPI ID
+};
+
 // Create auth client
 const getAuthClient = () => {
     try {
@@ -212,13 +218,22 @@ app.post('/qr-code', async (req, res) => {
             });
         }
 
-        const qrData = JSON.stringify({
-            amount,
-            paymentMethod,
-            timestamp: new Date().toISOString()
-        });
+        // Generate UPI URL based on payment method
+        let upiUrl;
+        if (paymentMethod === 'gpay') {
+            upiUrl = `upi://pay?pa=${UPI_IDS.gpay}&pn=RITI&am=${amount}&cu=INR`;
+        } else if (paymentMethod === 'phonepe') {
+            upiUrl = `upi://pay?pa=${UPI_IDS.phonepe}&pn=RITI&am=${amount}&cu=INR`;
+        } else {
+            // For cash or other payment methods, just create a simple QR with the data
+            upiUrl = JSON.stringify({
+                amount,
+                paymentMethod,
+                timestamp: new Date().toISOString()
+            });
+        }
 
-        const qrCodeDataURL = await QRCode.toDataURL(qrData);
+        const qrCodeDataURL = await QRCode.toDataURL(upiUrl);
 
         return res.status(200).json({
             success: true,
