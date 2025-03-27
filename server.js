@@ -1,17 +1,14 @@
 const express = require('express');
 const cors = require('cors');
+const { google } = require('googleapis');
 const multer = require('multer');
 const QRCode = require('qrcode');
 const path = require('path');
-const fs = require('fs');
+require('dotenv').config();
 
-// Simple logger
-const logger = {
-    info: (...args) => console.log('[INFO]', ...args),
-    error: (...args) => console.error('[ERROR]', ...args)
-};
+// Set OpenSSL configuration before anything else
+process.env.OPENSSL_CONF = '/dev/null';
 
-// Set up Express
 const app = express();
 const upload = multer();
 const PORT = process.env.PORT || 3000;
@@ -22,7 +19,39 @@ app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 app.use(express.static(path.join(__dirname, 'public')));
 
-// In-memory storage for registrations (temporary solution)
+// Logger setup
+const logger = {
+    info: (...args) => console.log('[INFO]', ...args),
+    error: (...args) => console.error('[ERROR]', ...args)
+};
+
+// Google Sheets Configuration
+const SPREADSHEET_ID = '1wVWWOjFWaSqgR0pHCUvjwdxfscwxN2lK9uA_WW4ZrbU';
+
+// Create auth client - using keyFile directly which was working before
+const getAuthClient = () => {
+    try {
+        return new google.auth.GoogleAuth({
+            keyFile: 'credentials.json',
+            scopes: ['https://www.googleapis.com/auth/spreadsheets']
+        });
+    } catch (error) {
+        logger.error('Auth client creation error:', error);
+        throw error;
+    }
+};
+
+// Test connection on startup
+(async () => {
+    try {
+        const auth = await getAuthClient();
+        logger.info('Successfully created auth client');
+    } catch (error) {
+        logger.error('Google Sheets connection error:', error);
+    }
+})();
+
+// In-memory fallback storage for registrations
 const registrations = [];
 
 // API Endpoints
@@ -78,9 +107,46 @@ app.post('/api/register', upload.none(), async (req, res) => {
             timestamp: new Date().toISOString()
         };
 
-        // Store registration in memory
-        registrations.push(registration);
-        logger.info(`Registration saved with ID: ${participantId}`);
+        // Prepare data for Google Sheets
+        const values = [[
+            participantId,
+            formData.name,
+            formData.mobile,
+            formData.year,
+            formData.branch,
+            formData.section,
+            formData.selectedPackage,
+            formData.paymentMethod,
+            formData.amount,
+            formData.transactionId || 'N/A',
+            new Date().toISOString(),
+            formData.gameSelection || 'Both Games' // Add game selection or default to Both Games
+        ]];
+
+        // Try to write to Google Sheets
+        try {
+            const auth = await getAuthClient();
+            const client = await auth.getClient();
+            logger.info('Successfully created auth client for write operation');
+
+            const sheets = google.sheets({ version: 'v4', auth: client });
+            const result = await sheets.spreadsheets.values.append({
+                spreadsheetId: SPREADSHEET_ID,
+                range: 'Sheet1',
+                valueInputOption: 'USER_ENTERED',
+                insertDataOption: 'INSERT_ROWS',
+                resource: { values }
+            });
+
+            logger.info('Successfully wrote to Google Sheets:', {
+                updatedRange: result.data.updates?.updatedRange,
+                updatedRows: result.data.updates?.updatedRows
+            });
+        } catch (error) {
+            // If Google Sheets fails, store in memory as fallback
+            logger.error('Failed to save to Google Sheets, using memory fallback:', error);
+            registrations.push(registration);
+        }
 
         // Generate QR code
         const qrData = JSON.stringify({
@@ -100,6 +166,11 @@ app.post('/api/register', upload.none(), async (req, res) => {
             success: true,
             message: 'Registration successful',
             participantId,
+            participantData: {
+                id: participantId,
+                name: formData.name,
+                package: formData.selectedPackage
+            },
             qrCode: qrCodeDataURL
         });
     } catch (error) {
@@ -155,11 +226,6 @@ app.get('/api/registrations', (req, res) => {
 // Serve index.html for the root route
 app.get('/', (req, res) => {
     res.sendFile(path.join(__dirname, 'public', 'index.html'));
-});
-
-// Serve favicon.ico
-app.get('/favicon.ico', (req, res) => {
-    res.sendFile(path.join(__dirname, 'public', 'favicon.ico'));
 });
 
 // Start server
