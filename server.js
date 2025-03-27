@@ -39,10 +39,10 @@ const getAuthClient = () => {
     try {
         // Check if credentials file exists
         const fs = require('fs');
-        const credentialsPath = path.join(__dirname, 'credentials.json');
+        const credentialsPath = path.join(__dirname, 'zap-kitchen-dd2ce00e67aa.json');
         
         if (fs.existsSync(credentialsPath)) {
-            logger.info('Using credentials file for authentication');
+            logger.info('Using zap-kitchen credentials file for authentication');
             return new google.auth.GoogleAuth({
                 keyFile: credentialsPath,
                 scopes: ['https://www.googleapis.com/auth/spreadsheets']
