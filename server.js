@@ -84,7 +84,7 @@ app.post('/api/register', upload.none(), async (req, res) => {
         logger.info('Received registration data:', formData);
 
         // Basic validation
-        const requiredFields = ['name', 'hallTicket', 'mobile', 'year', 'branch', 'section', 'selectedPackage', 'paymentMethod', 'amount'];
+        const requiredFields = ['name', 'mobile', 'year', 'branch', 'section', 'selectedPackage', 'paymentMethod', 'amount'];
         const missingFields = requiredFields.filter(field => !formData[field]);
         
         if (missingFields.length > 0) {
@@ -118,7 +118,6 @@ app.post('/api/register', upload.none(), async (req, res) => {
         const values = [[
             participantId,
             formData.name,
-            formData.hallTicket,
             formData.mobile,
             formData.year,
             formData.branch,
@@ -265,14 +264,13 @@ app.get('/api/participant/:id', async (req, res) => {
             participant: {
                 id: participant[0],
                 name: participant[1],
-                hallTicket: participant[2],
-                mobile: participant[3],
-                year: participant[4],
-                branch: participant[5],
-                section: participant[6],
-                selectedPackage: participant[7],
-                paymentMethod: participant[8],
-                amount: participant[9]
+                mobile: participant[2],
+                year: participant[3],
+                branch: participant[4],
+                section: participant[5],
+                selectedPackage: participant[6],
+                paymentMethod: participant[7],
+                amount: participant[8]
             }
         });
 

@@ -68,6 +68,21 @@ document.addEventListener('DOMContentLoaded', function() {
         }
     });
 
+    // Function to toggle game selection visibility based on package
+    const toggleGameSelection = () => {
+        const gameSelectionContainer = document.getElementById('game-selection-container');
+        const gameSelection = document.getElementById('game-selection');
+        
+        if (selectedGames === '1') {
+            gameSelectionContainer.classList.remove('hidden');
+            gameSelection.required = true;
+        } else {
+            gameSelectionContainer.classList.add('hidden');
+            gameSelection.required = false;
+            gameSelection.value = '';
+        }
+    };
+
     // Game package selection
     document.querySelectorAll('.select-package').forEach(button => {
         button.addEventListener('click', function() {
@@ -79,6 +94,25 @@ document.addEventListener('DOMContentLoaded', function() {
             
             document.getElementById('game-options').classList.add('hidden');
             document.getElementById('payment-section').classList.remove('hidden');
+            
+            toggleGameSelection();
+        });
+    });
+
+    // Back button functionality
+    document.getElementById('back-to-packages').addEventListener('click', function() {
+        document.getElementById('payment-section').classList.add('hidden');
+        document.getElementById('registration-form').classList.add('hidden');
+        document.getElementById('game-options').classList.remove('hidden');
+        
+        // Reset payment selections
+        selectedPaymentMethod = null;
+        document.getElementById('payment-method-display').value = '';
+        document.getElementById('qr-display').classList.add('hidden');
+        
+        // Reset payment button colors
+        document.querySelectorAll('.payment-method').forEach(btn => {
+            btn.classList.remove('bg-blue-600', 'bg-purple-600', 'bg-gray-600');
         });
     });
 
@@ -172,15 +206,21 @@ document.addEventListener('DOMContentLoaded', function() {
         
         // Get form values
         const name = document.getElementById('name').value.trim();
-        const hallTicket = document.getElementById('hallTicket').value.trim();
         const mobile = document.getElementById('mobile').value.trim();
         const year = document.getElementById('year').value;
         const branch = document.getElementById('branch').value;
         const section = document.getElementById('section').value.trim();
+        const gameSelection = document.getElementById('game-selection').value;
 
         // Validate all required fields
-        if (!name || !hallTicket || !mobile || !year || !branch || !section || !selectedGames || !selectedPaymentMethod || !selectedAmount) {
+        if (!name || !mobile || !year || !branch || !section || !selectedGames || !selectedPaymentMethod || !selectedAmount) {
             alert('Please fill in all required fields');
+            return;
+        }
+
+        // Validate game selection for single game package
+        if (selectedGames === '1' && !gameSelection) {
+            alert('Please select a game');
             return;
         }
 
@@ -192,12 +232,18 @@ document.addEventListener('DOMContentLoaded', function() {
 
         // Add form fields
         formData.append('name', name);
-        formData.append('hallTicket', hallTicket);
         formData.append('mobile', mobile);
         formData.append('year', year);
         formData.append('branch', branch);
         formData.append('section', section);
-        formData.append('selectedPackage', selectedGames + ' Games');
+        
+        // Handle game selection
+        if (selectedGames === '1') {
+            formData.append('selectedPackage', gameSelection);
+        } else {
+            formData.append('selectedPackage', '2 Games Package');
+        }
+        
         formData.append('paymentMethod', selectedPaymentMethod === 'gpay' ? 'GPAY' : selectedPaymentMethod === 'phonepe' ? 'PHONEPE' : 'CASH');
         formData.append('amount', selectedAmount);
 

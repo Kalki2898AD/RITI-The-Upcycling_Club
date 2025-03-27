@@ -29,23 +29,40 @@
             <p class="text-gray-600">Join us in making a sustainable difference!</p>
         </header>
 
+        <!-- Promotional Content -->
+        <div class="bg-white rounded-lg shadow-lg p-6 mb-8 text-center">
+            <h2 class="text-2xl font-semibold text-green-700 mb-4">Join Us for Exciting Games!</h2>
+            <p class="text-gray-700 mb-4">RITI is excited to invite you to two thrilling games – Galaxy Golf and Nerf Shoot Down! Get ready for an action-packed experience where you can test your aim, strategy, and skills in a fun, competitive environment.</p>
+            <div class="flex flex-col md:flex-row justify-center gap-4 mb-4">
+                <div class="bg-green-50 p-4 rounded-lg flex-1">
+                    <h3 class="text-xl font-semibold text-green-700 mb-2">🔹 Galaxy Golf</h3>
+                    <p class="text-gray-600">A cosmic twist on mini-golf with exciting challenges!</p>
+                </div>
+                <div class="bg-green-50 p-4 rounded-lg flex-1">
+                    <h3 class="text-xl font-semibold text-green-700 mb-2">🔹 Nerf Shoot Down</h3>
+                    <p class="text-gray-600">Aim, shoot, and take down targets in this adrenaline-filled game!</p>
+                </div>
+            </div>
+            <p class="text-green-700 font-semibold">Don't miss out on the fun! Register now to secure your spot.</p>
+        </div>
+
         <!-- Game Options -->
         <div id="game-options" class="bg-white rounded-lg shadow-lg p-6 mb-8">
             <h2 class="text-2xl font-semibold text-green-700 mb-6">Select Your Game Package</h2>
             <div class="grid md:grid-cols-2 gap-6">
                 <div class="game-option border-2 border-green-200 rounded-lg p-6 hover:border-green-500 cursor-pointer transition-all">
                     <h3 class="text-xl font-semibold text-green-700 mb-2">2 Games Package</h3>
-                    <p class="text-gray-600 mb-4">Play 2 games of your choice</p>
-                    <div class="text-2xl font-bold text-green-600">₹30</div>
-                    <button class="select-package mt-4 w-full bg-green-500 hover:bg-green-600 text-white py-2 rounded" data-amount="30" data-games="2">
+                    <p class="text-gray-600 mb-4">Play both Galaxy Golf and Nerf Shoot Down</p>
+                    <div class="text-2xl font-bold text-green-600">&#x20B9;40</div>
+                    <button class="select-package mt-4 w-full bg-green-500 hover:bg-green-600 text-white py-2 rounded" data-amount="40" data-games="2">
                         Select Package
                     </button>
                 </div>
                 <div class="game-option border-2 border-green-200 rounded-lg p-6 hover:border-green-500 cursor-pointer transition-all">
                     <h3 class="text-xl font-semibold text-green-700 mb-2">Single Game</h3>
-                    <p class="text-gray-600 mb-4">Play any 1 game of your choice</p>
-                    <div class="text-2xl font-bold text-green-600">₹15</div>
-                    <button class="select-package mt-4 w-full bg-green-500 hover:bg-green-600 text-white py-2 rounded" data-amount="15" data-games="1">
+                    <p class="text-gray-600 mb-4">Choose either Galaxy Golf or Nerf Shoot Down</p>
+                    <div class="text-2xl font-bold text-green-600">&#x20B9;20</div>
+                    <button class="select-package mt-4 w-full bg-green-500 hover:bg-green-600 text-white py-2 rounded" data-amount="20" data-games="1">
                         Select Package
                     </button>
                 </div>
@@ -54,7 +71,13 @@
 
         <!-- Payment Options -->
         <div id="payment-section" class="bg-white rounded-lg shadow-lg p-6 mb-8 hidden">
-            <h2 class="text-2xl font-semibold text-green-700 mb-6">Select Payment Method</h2>
+            <div class="flex justify-between items-center mb-6">
+                <button id="back-to-packages" class="text-green-700 hover:text-green-800">
+                    <i class="fas fa-arrow-left mr-2"></i> Back to packages
+                </button>
+                <h2 class="text-2xl font-semibold text-green-700">Select Payment Method</h2>
+                <div class="w-24"></div> <!-- Empty div for balance -->
+            </div>
             <div class="grid md:grid-cols-3 gap-6">
                 <button class="payment-method flex items-center justify-center bg-blue-500 hover:bg-blue-600 text-white p-4 rounded-lg" data-method="gpay">
                     <img src="https://upload.wikimedia.org/wikipedia/commons/thumb/c/c7/Google_Pay_Logo_%282020%29.svg/1280px-Google_Pay_Logo_%282020%29.svg.png" alt="Google Pay" class="payment-logo">
@@ -99,9 +122,13 @@
                     <input type="text" id="name" name="name" required class="w-full p-2 border rounded">
                 </div>
 
-                <div>
-                    <label class="block text-gray-700 mb-2">Hall Ticket Number</label>
-                    <input type="text" id="hallTicket" name="hallTicket" required class="w-full p-2 border rounded">
+                <div id="game-selection-container">
+                    <label class="block text-gray-700 mb-2">Select Game</label>
+                    <select id="game-selection" name="gameSelection" required class="w-full p-2 border rounded">
+                        <option value="">Select a Game</option>
+                        <option value="Galaxy Golf">Galaxy Golf</option>
+                        <option value="Nerf Shoot Down">Nerf Shoot Down</option>
+                    </select>
                 </div>
 
                 <div>
